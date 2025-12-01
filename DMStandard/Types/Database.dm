@@ -5,6 +5,8 @@
 	proc/Error()
 	proc/ErrorMsg()
 	New(filename)
+		if (filename)
+			Open(filename)
 	proc/Open(filename)
 
 /database/query
@@ -18,10 +20,9 @@
 	proc/Execute(database)
 	proc/GetColumn(column)
 	proc/GetRowData()
-	New(text, ...)
+	New(Query, Cursor)
 	proc/NextRow()
 	proc/RowsAffected()
 
 	proc/Reset()
-		set opendream_unimplemented = TRUE
 

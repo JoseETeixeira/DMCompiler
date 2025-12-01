@@ -726,7 +726,7 @@ bool DMCompiler::EmitBytecode() {
         
         // Compile the proc body
         if (!stmtCompiler.CompileBlockInner(proc->AstBody)) {
-            ForcedWarning("Failed to compile proc: " + proc->Name);
+            ForcedWarning("Failed to compile proc: " + proc->OwningObject->Path.ToString() + "/" + proc->Name);
             continue;
         }
         

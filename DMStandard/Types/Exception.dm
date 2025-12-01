@@ -7,9 +7,14 @@
 	var/file
 	var/line
 
-/exception/New(N, F, L)
-	name = N
-	file = F
-	line = L
+	New(name, file, line)
+		src.name = name
+		src.file = file
+		src.line = line
+
+proc/EXCEPTION(message)
+	var/exception/E = new(message)
+	E.desc = message
+	return E
 
 

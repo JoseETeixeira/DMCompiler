@@ -19,7 +19,8 @@ void DMBuiltinRegistry::InitializeBuiltins() {
     // Initialize built-in types
     BuiltinTypes_ = {
         "/datum", "/atom", "/atom/movable", "/obj", "/mob", "/turf", "/area", 
-        "/client", "/world", "/list", "/savefile", "/sound", "/image", "/icon", "/matrix", "/regex", "/exception"
+        "/client", "/world", "/list", "/savefile", "/sound", "/image", "/icon", "/matrix", "/regex", "/exception",
+        "/database", "/database/query", "/generator", "/mutable_appearance", "/particles", "/pixloc", "/vector"
     };
     
     // Initialize type hierarchy for built-ins
@@ -39,6 +40,13 @@ void DMBuiltinRegistry::InitializeBuiltins() {
     TypeHierarchy_["/matrix"] = "/datum";
     TypeHierarchy_["/regex"] = "/datum";
     TypeHierarchy_["/exception"] = "/datum";
+    TypeHierarchy_["/database"] = "/datum";
+    TypeHierarchy_["/database/query"] = "/datum";
+    TypeHierarchy_["/generator"] = "/datum";
+    TypeHierarchy_["/mutable_appearance"] = "/image";
+    TypeHierarchy_["/particles"] = "/datum";
+    TypeHierarchy_["/pixloc"] = "/datum";
+    TypeHierarchy_["/vector"] = "/datum";
 
     RegisterGlobalProcs();
     RegisterTypeProcs();
@@ -196,6 +204,22 @@ void DMBuiltinRegistry::RegisterGlobalProcs() {
     GlobalProcs_["ckey"] = ProcSignature("ckey", {"Key"}, DMValueType::Text);
     GlobalProcs_["sorttext"] = ProcSignature("sorttext", {"T1", "T2"}, DMValueType::Num);
     GlobalProcs_["sorttextEx"] = ProcSignature("sorttextEx", {"T1", "T2"}, DMValueType::Num);
+    GlobalProcs_["cmptext"] = ProcSignature("cmptext", {"T1"}, DMValueType::Num, true);
+    GlobalProcs_["cmptextEx"] = ProcSignature("cmptextEx", {"T1"}, DMValueType::Num, true);
+    GlobalProcs_["copytext_char"] = ProcSignature("copytext_char", {"T", "Start", "End"}, DMValueType::Text);
+    GlobalProcs_["findlasttext"] = ProcSignature("findlasttext", {"Haystack", "Needle", "Start", "End"}, DMValueType::Num);
+    GlobalProcs_["findlasttextEx"] = ProcSignature("findlasttextEx", {"Haystack", "Needle", "Start", "End"}, DMValueType::Num);
+    GlobalProcs_["replacetext"] = ProcSignature("replacetext", {"Haystack", "Needle", "Replacement", "Start", "End"}, DMValueType::Text);
+    GlobalProcs_["replacetextEx"] = ProcSignature("replacetextEx", {"Haystack", "Needle", "Replacement", "Start", "End"}, DMValueType::Text);
+    GlobalProcs_["spantext"] = ProcSignature("spantext", {"Haystack", "Needles", "Start"}, DMValueType::Num);
+    GlobalProcs_["nonspantext"] = ProcSignature("nonspantext", {"Haystack", "Needles", "Start"}, DMValueType::Num);
+    GlobalProcs_["splicetext"] = ProcSignature("splicetext", {"Text", "Start", "End", "Insert"}, DMValueType::Text);
+    GlobalProcs_["trimtext"] = ProcSignature("trimtext", {"Text"}, DMValueType::Text);
+    GlobalProcs_["md5"] = ProcSignature("md5", {"T"}, DMValueType::Text);
+    GlobalProcs_["sha1"] = ProcSignature("sha1", {"T"}, DMValueType::Text);
+    GlobalProcs_["json_encode"] = ProcSignature("json_encode", {"Value"}, DMValueType::Text);
+    GlobalProcs_["json_decode"] = ProcSignature("json_decode", {"JSON"}, DMValueType::Anything);
+    GlobalProcs_["regex"] = ProcSignature("regex", {"pattern", "flags"}, DMValueType::Anything);
     
     // File procs
     GlobalProcs_["file2text"] = ProcSignature("file2text", {"File"}, DMValueType::Text);
@@ -204,6 +228,13 @@ void DMBuiltinRegistry::RegisterGlobalProcs() {
     GlobalProcs_["fcopy"] = ProcSignature("fcopy", {"Src", "Dst"}, DMValueType::Num);
     GlobalProcs_["fdel"] = ProcSignature("fdel", {"File"}, DMValueType::Num);
     GlobalProcs_["file"] = ProcSignature("file", {"Path"}, DMValueType::Anything); // Returns file resource
+    GlobalProcs_["browse"] = ProcSignature("browse", {"Body", "Options"}, DMValueType::Null);
+    GlobalProcs_["browse_rsc"] = ProcSignature("browse_rsc", {"File", "FileName"}, DMValueType::Null);
+    GlobalProcs_["fcopy_rsc"] = ProcSignature("fcopy_rsc", {"File"}, DMValueType::Num);
+    GlobalProcs_["ftp"] = ProcSignature("ftp", {"File", "Name"}, DMValueType::Null);
+    GlobalProcs_["load_resource"] = ProcSignature("load_resource", {"File"}, DMValueType::Anything);
+    GlobalProcs_["run"] = ProcSignature("run", {"File"}, DMValueType::Null);
+    GlobalProcs_["shell"] = ProcSignature("shell", {"Command"}, DMValueType::Null);
     
     // Math procs
     GlobalProcs_["sin"] = ProcSignature("sin", {"X"}, DMValueType::Num);
@@ -221,17 +252,41 @@ void DMBuiltinRegistry::RegisterGlobalProcs() {
     GlobalProcs_["prob"] = ProcSignature("prob", {"P"}, DMValueType::Num);
     GlobalProcs_["roll"] = ProcSignature("roll", {"dice"}, DMValueType::Num);
     GlobalProcs_["clamp"] = ProcSignature("clamp", {"Value", "Low", "High"}, DMValueType::Num);
+    GlobalProcs_["ceil"] = ProcSignature("ceil", {"A"}, DMValueType::Num);
+    GlobalProcs_["floor"] = ProcSignature("floor", {"A"}, DMValueType::Num);
+    GlobalProcs_["fract"] = ProcSignature("fract", {"n"}, DMValueType::Num);
+    GlobalProcs_["trunc"] = ProcSignature("trunc", {"n"}, DMValueType::Num);
+    GlobalProcs_["sign"] = ProcSignature("sign", {"A"}, DMValueType::Num);
+    GlobalProcs_["log"] = ProcSignature("log", {"X", "Base"}, DMValueType::Num);
+    GlobalProcs_["matrix"] = ProcSignature("matrix", {"..."}, DMValueType::Anything, true);
+    GlobalProcs_["vector"] = ProcSignature("vector", {"..."}, DMValueType::Anything, true);
+    GlobalProcs_["gradient"] = ProcSignature("gradient", {"A", "index"}, DMValueType::Anything);
+    GlobalProcs_["lerp"] = ProcSignature("lerp", {"A", "B", "factor"}, DMValueType::Anything);
+    GlobalProcs_["turn"] = ProcSignature("turn", {"Dir", "Angle"}, DMValueType::Num);
     
     // Misc procs
     GlobalProcs_["sleep"] = ProcSignature("sleep", {"Delay"}, DMValueType::Null);
     GlobalProcs_["spawn"] = ProcSignature("spawn", {"Delay"}, DMValueType::Null);
     GlobalProcs_["del"] = ProcSignature("del", {"O"}, DMValueType::Null); // Note: del is a statement but also a proc
+    GlobalProcs_["arglist"] = ProcSignature("arglist", {"args"}, DMValueType::Anything);
+    GlobalProcs_["missile"] = ProcSignature("missile", {"Type", "Start", "End"}, DMValueType::Null);
+    GlobalProcs_["CRASH"] = ProcSignature("CRASH", {"msg"}, DMValueType::Null);
+    GlobalProcs_["EXCEPTION"] = ProcSignature("EXCEPTION", {"message"}, DMValueType::Anything);
+    GlobalProcs_["animate"] = ProcSignature("animate", {"Object", "time", "loop", "easing", "flags"}, DMValueType::Null);
+    GlobalProcs_["flick"] = ProcSignature("flick", {"Icon", "Object"}, DMValueType::Null);
+    GlobalProcs_["image"] = ProcSignature("image", {"icon", "loc", "icon_state", "layer", "dir"}, DMValueType::Anything);
+    GlobalProcs_["icon"] = ProcSignature("icon", {"icon", "icon_state", "dir", "frame", "moving"}, DMValueType::Anything);
+    GlobalProcs_["icon_states"] = ProcSignature("icon_states", {"Icon", "mode"}, DMValueType::Anything);
     GlobalProcs_["locate"] = ProcSignature("locate", {"X", "Y", "Z"}, DMValueType::Anything);
     GlobalProcs_["block"] = ProcSignature("block", {"Start", "End"}, DMValueType::Anything);
     GlobalProcs_["oview"] = ProcSignature("oview", {"Dist", "Center"}, DMValueType::Anything);
     GlobalProcs_["view"] = ProcSignature("view", {"Dist", "Center"}, DMValueType::Anything);
     GlobalProcs_["orange"] = ProcSignature("orange", {"Dist", "Center"}, DMValueType::Anything);
     GlobalProcs_["range"] = ProcSignature("range", {"Dist", "Center"}, DMValueType::Anything);
+    GlobalProcs_["hearers"] = ProcSignature("hearers", {"Depth", "Center"}, DMValueType::Anything);
+    GlobalProcs_["ohearers"] = ProcSignature("ohearers", {"Depth", "Center"}, DMValueType::Anything);
+    GlobalProcs_["viewers"] = ProcSignature("viewers", {"Depth", "Center"}, DMValueType::Anything);
+    GlobalProcs_["oviewers"] = ProcSignature("oviewers", {"Depth", "Center"}, DMValueType::Anything);
     GlobalProcs_["istype"] = ProcSignature("istype", {"Object", "Type"}, DMValueType::Num, true);
     GlobalProcs_["isnull"] = ProcSignature("isnull", {"Val"}, DMValueType::Num);
     GlobalProcs_["isnum"] = ProcSignature("isnum", {"Val"}, DMValueType::Num);
@@ -239,11 +294,21 @@ void DMBuiltinRegistry::RegisterGlobalProcs() {
     GlobalProcs_["istext"] = ProcSignature("istext", {"Val"}, DMValueType::Num);
     GlobalProcs_["isloc"] = ProcSignature("isloc", {"Val"}, DMValueType::Num);
     GlobalProcs_["isicon"] = ProcSignature("isicon", {"Val"}, DMValueType::Num);
+    GlobalProcs_["isarea"] = ProcSignature("isarea", {"Val"}, DMValueType::Num);
+    GlobalProcs_["ismob"] = ProcSignature("ismob", {"Val"}, DMValueType::Num);
+    GlobalProcs_["isobj"] = ProcSignature("isobj", {"Val"}, DMValueType::Num);
+    GlobalProcs_["isturf"] = ProcSignature("isturf", {"Val"}, DMValueType::Num);
+    GlobalProcs_["ismovable"] = ProcSignature("ismovable", {"Val"}, DMValueType::Num);
+    GlobalProcs_["islist"] = ProcSignature("islist", {"Val"}, DMValueType::Num);
+    GlobalProcs_["isinf"] = ProcSignature("isinf", {"n"}, DMValueType::Num);
+    GlobalProcs_["isnan"] = ProcSignature("isnan", {"n"}, DMValueType::Num);
+    GlobalProcs_["ispointer"] = ProcSignature("ispointer", {"Value"}, DMValueType::Num);
     GlobalProcs_["isfile"] = ProcSignature("isfile", {"Val"}, DMValueType::Num);
     GlobalProcs_["newlist"] = ProcSignature("newlist", {"..."}, DMValueType::Anything, true);
     GlobalProcs_["typesof"] = ProcSignature("typesof", {"TypePath"}, DMValueType::Anything);
     GlobalProcs_["params2list"] = ProcSignature("params2list", {"Params"}, DMValueType::Anything);
     GlobalProcs_["list2params"] = ProcSignature("list2params", {"List"}, DMValueType::Text);
+    GlobalProcs_["text2path"] = ProcSignature("text2path", {"T"}, DMValueType::Path);
     GlobalProcs_["html_encode"] = ProcSignature("html_encode", {"T"}, DMValueType::Text);
     GlobalProcs_["html_decode"] = ProcSignature("html_decode", {"T"}, DMValueType::Text);
     GlobalProcs_["url_encode"] = ProcSignature("url_encode", {"T"}, DMValueType::Text);
@@ -256,8 +321,44 @@ void DMBuiltinRegistry::RegisterGlobalProcs() {
     GlobalProcs_["issaved"] = ProcSignature("issaved", {"Var"}, DMValueType::Num);
     GlobalProcs_["input"] = ProcSignature("input", {"..."}, DMValueType::Anything, true);
     GlobalProcs_["alert"] = ProcSignature("alert", {"..."}, DMValueType::Anything, true);
-    GlobalProcs_["shutdown"] = ProcSignature("shutdown", {"Addr", "Reason"}, DMValueType::Null);
+    GlobalProcs_["call_ext"] = ProcSignature("call_ext", {"LibName", "FuncName"}, DMValueType::Anything);
+    GlobalProcs_["load_ext"] = ProcSignature("load_ext", {"LibName", "FuncName"}, DMValueType::Anything);
+    GlobalProcs_["generator"] = ProcSignature("generator", {"type", "A", "B", "rand"}, DMValueType::Anything);
+    GlobalProcs_["get_dir"] = ProcSignature("get_dir", {"Loc1", "Loc2"}, DMValueType::Num);
+    GlobalProcs_["get_dist"] = ProcSignature("get_dist", {"Loc1", "Loc2"}, DMValueType::Num);
+    GlobalProcs_["get_step"] = ProcSignature("get_step", {"Ref", "Dir"}, DMValueType::Anything);
+    GlobalProcs_["get_step_away"] = ProcSignature("get_step_away", {"Ref", "Trg", "Max"}, DMValueType::Anything);
+    GlobalProcs_["get_step_rand"] = ProcSignature("get_step_rand", {"Ref"}, DMValueType::Anything);
+    GlobalProcs_["get_step_to"] = ProcSignature("get_step_to", {"Ref", "Trg", "Min"}, DMValueType::Anything);
+    GlobalProcs_["get_step_towards"] = ProcSignature("get_step_towards", {"Ref", "Trg"}, DMValueType::Anything);
+    GlobalProcs_["get_steps_to"] = ProcSignature("get_steps_to", {"Ref", "Trg", "Min"}, DMValueType::Anything);
+    GlobalProcs_["link"] = ProcSignature("link", {"url"}, DMValueType::Null);
+    GlobalProcs_["output"] = ProcSignature("output", {"Msg", "Control"}, DMValueType::Null);
+    GlobalProcs_["pick"] = ProcSignature("pick", {"..."}, DMValueType::Anything, true);
+    GlobalProcs_["rand_seed"] = ProcSignature("rand_seed", {"Seed"}, DMValueType::Null);
+    GlobalProcs_["ref"] = ProcSignature("ref", {"Object"}, DMValueType::Text);
+    GlobalProcs_["refcount"] = ProcSignature("refcount", {"Object"}, DMValueType::Num);
+    GlobalProcs_["sound"] = ProcSignature("sound", {"file", "repeat", "wait", "channel", "volume"}, DMValueType::Anything);
+    GlobalProcs_["stat"] = ProcSignature("stat", {"Name", "Value"}, DMValueType::Null);
+    GlobalProcs_["statpanel"] = ProcSignature("statpanel", {"Panel", "Name", "Value"}, DMValueType::Null);
+    GlobalProcs_["step"] = ProcSignature("step", {"Ref", "Dir", "Speed"}, DMValueType::Num);
+    GlobalProcs_["step_away"] = ProcSignature("step_away", {"Ref", "Trg", "Max", "Speed"}, DMValueType::Num);
+    GlobalProcs_["step_rand"] = ProcSignature("step_rand", {"Ref", "Speed"}, DMValueType::Num);
+    GlobalProcs_["step_to"] = ProcSignature("step_to", {"Ref", "Trg", "Min", "Speed"}, DMValueType::Num);
+    GlobalProcs_["step_towards"] = ProcSignature("step_towards", {"Ref", "Trg", "Speed"}, DMValueType::Num);
+    GlobalProcs_["walk"] = ProcSignature("walk", {"Ref", "Dir", "Lag", "Speed"}, DMValueType::Null);
+    GlobalProcs_["walk_away"] = ProcSignature("walk_away", {"Ref", "Trg", "Max", "Lag", "Speed"}, DMValueType::Null);
+    GlobalProcs_["walk_rand"] = ProcSignature("walk_rand", {"Ref", "Lag", "Speed"}, DMValueType::Null);
+    GlobalProcs_["walk_to"] = ProcSignature("walk_to", {"Ref", "Trg", "Min", "Lag", "Speed"}, DMValueType::Null);
+    GlobalProcs_["walk_towards"] = ProcSignature("walk_towards", {"Ref", "Trg", "Lag", "Speed"}, DMValueType::Null);
+    GlobalProcs_["winset"] = ProcSignature("winset", {"player", "control_id", "params"}, DMValueType::Null);
+    GlobalProcs_["winget"] = ProcSignature("winget", {"player", "control_id", "params"}, DMValueType::Text);
+    GlobalProcs_["winclone"] = ProcSignature("winclone", {"player", "window_name", "clone_name"}, DMValueType::Null);
+    GlobalProcs_["winexists"] = ProcSignature("winexists", {"player", "control_id"}, DMValueType::Num);
+    GlobalProcs_["winshow"] = ProcSignature("winshow", {"player", "window", "show"}, DMValueType::Null);
+    GlobalProcs_["shutdown"] = ProcSignature("shutdown", {"Addr", "Natural"}, DMValueType::Null);
     GlobalProcs_["startup"] = ProcSignature("startup", {"Port", "Addr"}, DMValueType::Null);
+    GlobalProcs_["set_background"] = ProcSignature("set_background", {"mode"}, DMValueType::Null);
 }
 
 void DMBuiltinRegistry::RegisterTypeProcs() {
@@ -381,6 +482,30 @@ void DMBuiltinRegistry::RegisterTypeProcs() {
     RegisterProcForType("/regex", ProcSignature("New", {"Pattern", "Flags"}, DMValueType::Null));
     RegisterProcForType("/regex", ProcSignature("Find", {"Text", "Start"}, DMValueType::Num));
     RegisterProcForType("/regex", ProcSignature("Replace", {"Text", "Replacement", "Start"}, DMValueType::Text));
+
+    // /database procs
+    RegisterProcForType("/database", ProcSignature("Open", {"File"}, DMValueType::Num));
+    RegisterProcForType("/database", ProcSignature("Close", {}, DMValueType::Null));
+    RegisterProcForType("/database", ProcSignature("Error", {}, DMValueType::Num));
+    RegisterProcForType("/database", ProcSignature("ErrorMsg", {}, DMValueType::Text));
+
+    // /database/query procs
+    RegisterProcForType("/database/query", ProcSignature("New", {"Query", "Cursor"}, DMValueType::Null));
+    RegisterProcForType("/database/query", ProcSignature("Add", {"Text", "..."}, DMValueType::Null, true));
+    RegisterProcForType("/database/query", ProcSignature("Execute", {"Database"}, DMValueType::Num));
+    RegisterProcForType("/database/query", ProcSignature("NextRow", {}, DMValueType::Num));
+    RegisterProcForType("/database/query", ProcSignature("GetRowData", {}, DMValueType::Anything));
+    RegisterProcForType("/database/query", ProcSignature("GetColumn", {"Column"}, DMValueType::Anything));
+    RegisterProcForType("/database/query", ProcSignature("RowsAffected", {}, DMValueType::Num));
+    RegisterProcForType("/database/query", ProcSignature("Close", {}, DMValueType::Null));
+    RegisterProcForType("/database/query", ProcSignature("Error", {}, DMValueType::Num));
+    RegisterProcForType("/database/query", ProcSignature("ErrorMsg", {}, DMValueType::Text));
+    RegisterProcForType("/database/query", ProcSignature("Columns", {"Column"}, DMValueType::Anything));
+    RegisterProcForType("/database/query", ProcSignature("Clear", {}, DMValueType::Null));
+    RegisterProcForType("/database/query", ProcSignature("Reset", {}, DMValueType::Null));
+
+    // /generator procs
+    RegisterProcForType("/generator", ProcSignature("Rand", {}, DMValueType::Num));
 }
 
 void DMBuiltinRegistry::RegisterBuiltinVars() {

@@ -412,13 +412,7 @@ void DMLexer::SkipLineComment() {
     while (!AtEndOfSource_ && GetCurrent() != '\n') {
         Advance();
     }
-    // Line comments consume the trailing newline as part of the comment
-    // This makes sense: commenting a line comments out the entire statement including its terminator
-    if (!AtEndOfSource_ && GetCurrent() == '\n') {
-        Advance(); // Consume the newline
-        CurrentLocation_.Line++; // Move to next line
-        CurrentLocation_.Column = 0; // Reset column (note: Advance() already incremented it, so this sets it to 0, and the next Advance() will make it 1)
-    }
+    // Do NOT consume the newline. The newline is a token that should be emitted.
 }
 
 void DMLexer::SkipBlockComment() {

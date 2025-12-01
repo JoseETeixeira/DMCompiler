@@ -10,7 +10,6 @@
 	var/f = 0
 
 	proc/Interpolate(Matrix2, t)
-		set opendream_unimplemented = TRUE
 
 	New(var/a, var/b, var/c, var/d, var/e, var/f)
 

@@ -1,6 +1,6 @@
 # DMCompiler
 
-DMCompiler is a C++ implementation of a compiler for the DM (Dream Maker) language, . It compiles DM code (`.dme`, `.dm`) into a format compatible with the OpenDream runtime.
+DMCompiler is a C++ implementation of a compiler for the DM (Dream Maker) language. It compiles DM code (`.dme`, `.dm`) into a format compatible with the MYG runtime. This project is a migration and reimplementation of OpenDream's DM compiler, aiming for improved performance, maintainability, and compliance with the DM language specification.
 
 ## Prerequisites
 

@@ -84,7 +84,11 @@ void TestComments() {
     std::string source = "// Line comment\nvar x = 1;\n/* Block\ncomment */\nvar y = 2;";
     DMLexer lexer("test.dm", source);
     
-    // After line comment (which consumes its trailing newline), should get first real token
+    // After line comment, we should get the newline
+    Token newline0 = lexer.GetNextToken();
+    assert(newline0.Type == TokenType::Newline);
+
+    // Then the first real token
     Token tok1 = lexer.GetNextToken();
     assert(tok1.Type == TokenType::Var);
     

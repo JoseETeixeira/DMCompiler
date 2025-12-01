@@ -147,7 +147,7 @@ proc/splittext(Text, Delimiter) as /list
 proc/sqrt(A) as num
 proc/stat(Name, Value)
 proc/statpanel(Panel, Name, Value)
-proc/startup()
+proc/startup(Port, Addr)
 proc/step(Ref, Dir, Speed=0) as num
 proc/step_away(Ref, Trg, Max=5, Speed=0) as num
 proc/step_rand(Ref, Speed=0) as num

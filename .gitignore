@@ -45,3 +45,5 @@ Thumbs.db
 # Don't ignore testdata
 !tests/testdata/**
 Examples/
+docs/
+.kiro/
