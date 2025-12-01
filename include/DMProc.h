@@ -291,6 +291,10 @@ public:
     /// @param boolValue Optional boolean interpretation of the value
     void ApplySetAttribute(const std::string& attribute, const std::string& value, std::optional<bool> boolValue);
     
+    /// Set the verb source (what this verb can be used on)
+    /// @param source The verb source flags
+    void SetVerbSource(VerbSrc source);
+
     /// Compile this proc's AST body into bytecode
     /// This is called during Phase 4 (bytecode emission)
     /// @param compiler Pointer to the compiler for emitting bytecode

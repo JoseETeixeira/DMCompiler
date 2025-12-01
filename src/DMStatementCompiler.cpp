@@ -73,6 +73,30 @@ bool EvaluateSetConstant(DMASTExpression* expr, std::string& outString, std::opt
     return false;
 }
 
+VerbSrc AnalyzeVerbSrc(DMASTExpression* expr) {
+    if (!expr) return VerbSrc::Mob; // Default
+
+    // Handle identifiers: usr, world, contents
+    if (auto* ident = dynamic_cast<DMASTIdentifier*>(expr)) {
+        std::string name = ident->Identifier;
+        if (name == "usr") return VerbSrc::Mob;
+        if (name == "world") return VerbSrc::World;
+        if (name == "contents") return VerbSrc::ObjContents;
+        if (name == "group") return VerbSrc::MobGroup;
+    }
+    
+    // Handle calls: view(), oview()
+    if (auto* call = dynamic_cast<DMASTCall*>(expr)) {
+        if (auto* ident = dynamic_cast<DMASTIdentifier*>(call->Target.get())) {
+            std::string name = ident->Identifier;
+            if (name == "view") return VerbSrc::View;
+            if (name == "oview") return VerbSrc::OView;
+        }
+    }
+    
+    return VerbSrc::Mob; // Fallback
+}
+
 } // namespace
 
 DMStatementCompiler::DMStatementCompiler(DMCompiler* compiler, DMProc* proc, 
@@ -529,6 +553,7 @@ bool DMStatementCompiler::CompileForIn(DMASTProcStatementForIn* stmt) {
     // Step 2: Create list enumerator
     int enumeratorId = Proc_->GetNextEnumeratorId();
     Writer_->CreateListEnumerator(enumeratorId);
+    Writer_->ResizeStack(-1);  // CreateListEnumerator pops the list
     
     // Step 3: Create labels for the loop
     std::string loopLabel = NewLabel();
@@ -551,6 +576,7 @@ bool DMStatementCompiler::CompileForIn(DMASTProcStatementForIn* stmt) {
     
     DMReference outputRef;
     bool refCreated = false;
+    bool pushedBaseObject = false;
     
     // First, check if we have enhanced variable declaration information
     if (!stmt->VarDecl.Name.empty()) {
@@ -668,8 +694,17 @@ bool DMStatementCompiler::CompileForIn(DMASTProcStatementForIn* stmt) {
             else {
                 // For other cases, we'd need to compile the base expression and use Field reference
                 // This is more complex and not fully implemented yet
-                Compiler_->ForcedWarning("Complex field access in for-in loop not yet fully supported");
+                // Compiler_->ForcedWarning("Complex field access in for-in loop not yet fully supported");
                 
+                // Compile the base expression to push the object onto the stack
+                if (!ExprCompiler_->CompileExpression(deref->Expression.get())) {
+                    PopLoopContext();
+                    int destroyId = Proc_->DecrementEnumeratorId();
+                    Writer_->DestroyEnumerator(destroyId);
+                    return false;
+                }
+                pushedBaseObject = true;
+
                 // Try to use Field reference type (requires base object on stack)
                 int stringId = Compiler_->GetObjectTree()->AddString(fieldName);
                 outputRef.RefType = DMReference::Type::Field;
@@ -717,6 +752,12 @@ bool DMStatementCompiler::CompileForIn(DMASTProcStatementForIn* stmt) {
     // Pop loop context (always, regardless of body compilation success)
     PopLoopContext();
     
+    // If we pushed a base object for field access, pop it now
+    if (pushedBaseObject) {
+        Writer_->Emit(DreamProcOpcode::Pop);
+        Writer_->ResizeStack(-1);
+    }
+
     // Destroy the enumerator
     int destroyId = Proc_->DecrementEnumeratorId();
     Writer_->DestroyEnumerator(destroyId);
@@ -814,6 +855,11 @@ bool DMStatementCompiler::CompileSwitch(DMASTProcStatementSwitch* stmt) {
     // Compile all value cases
     for (const auto& caseInfo : valueCases) {
         EmitLabel(caseInfo.label);
+        
+        // The switch value is still on the stack when we jump here, so we must pop it
+        Writer_->Emit(DreamProcOpcode::Pop);
+        Writer_->ResizeStack(-1);
+
         if (!CompileBlockInner(caseInfo.body)) {
             PopLoopContext();
             return false;
@@ -845,12 +891,12 @@ bool DMStatementCompiler::CompileVarDeclaration(DMASTProcStatementVarDeclaration
         // Check if the variable already exists
         LocalVariable* var = Proc_->GetLocalVariable(varName);
         if (var) {
-            // Variable already exists - emit warning but continue (allow redeclaration)
-            std::string contextMsg = "Variable '" + varName + "' already declared at " + stmt->Location_.ToString();
-            if (Proc_ && Proc_->OwningObject) {
-                contextMsg += " in proc " + Proc_->OwningObject->Path.ToString() + "/" + Proc_->Name;
+            // Variable already exists - check if we need to update type info
+            // In DM, redeclaring a variable is allowed and often used to refine the type
+            if (decl.TypePath && !var->Type) {
+                var->Type = decl.TypePath;
             }
-            Compiler_->ForcedWarning(contextMsg);
+            // Do NOT warn about redeclaration - it's valid DM behavior
         } else {
             // Add the variable to the proc's local variables
             var = Proc_->AddLocalVariable(varName, decl.TypePath);
@@ -923,7 +969,16 @@ bool DMStatementCompiler::CompileSpawn(DMASTProcStatementSpawn* stmt) {
     
     // Compile the spawn body
     if (stmt->Body) {
+        // Save and clear loop context to isolate spawn body from outer loops.
+        // This ensures that 'continue' or 'break' statements inside the spawn
+        // do not incorrectly target loops outside the spawn (Requirement 5.1).
+        auto savedLoopStack = LoopStack_;
+        LoopStack_.clear();
+
         CompileBlockInner(stmt->Body.get());
+
+        // Restore loop context
+        LoopStack_ = savedLoopStack;
     }
     
     // Prevent the spawned thread from executing outside its code
@@ -1015,6 +1070,14 @@ bool DMStatementCompiler::CompileSet(DMASTProcStatementSet* stmt) {
         return true;
     }
     
+    if (stmt->Attribute == "src") {
+        VerbSrc source = AnalyzeVerbSrc(stmt->Value.get());
+        if (Proc_) {
+            Proc_->SetVerbSource(source);
+        }
+        return true;
+    }
+
     std::string valueString;
     std::optional<bool> boolValue;
     if (!EvaluateSetConstant(stmt->Value.get(), valueString, boolValue)) {

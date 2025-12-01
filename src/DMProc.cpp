@@ -249,6 +249,10 @@ void DMProc::ApplySetAttribute(const std::string& attribute, const std::string& 
     }
 }
 
+void DMProc::SetVerbSource(VerbSrc source) {
+    VerbSource = source;
+}
+
 std::string DMProc::ToString() const {
     std::ostringstream oss;
     
