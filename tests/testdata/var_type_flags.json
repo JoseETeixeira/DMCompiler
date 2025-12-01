@@ -1,0 +1,6313 @@
+{
+  "Metadata": {
+    "Version": true
+  },
+  "Strings": [
+
+  ],
+  "GlobalProcs": [
+217,
+33,
+200,
+1,
+29,
+107,
+0,
+13,
+2,
+60,
+169,
+39,
+190,
+3,
+96,
+61,
+58,
+6,
+4,
+46,
+5,
+10,
+193,
+7,
+54,
+8,
+9,
+159,
+41,
+23,
+196,
+181,
+192,
+12,
+43,
+14,
+15,
+16,
+17,
+18,
+19,
+117,
+20,
+21,
+22,
+24,
+45,
+25,
+26,
+40,
+27,
+210,
+158,
+28,
+30,
+31,
+32,
+34,
+203,
+35,
+90,
+68,
+36,
+37,
+211,
+42,
+38,
+55,
+44,
+206,
+207,
+156,
+213,
+208,
+209,
+62,
+105,
+52,
+164,
+152,
+56,
+166,
+57,
+59,
+63,
+124,
+64,
+65,
+66,
+167,
+67,
+69,
+70,
+71,
+72,
+188,
+73,
+74,
+75,
+76,
+77,
+78,
+198,
+221,
+79,
+113,
+80,
+81,
+82,
+83,
+84,
+85,
+153,
+86,
+87,
+88,
+184,
+91,
+92,
+191,
+93,
+94,
+95,
+97,
+98,
+99,
+100,
+186,
+102,
+103,
+104,
+106,
+108,
+109,
+135,
+110,
+111,
+112,
+161,
+114,
+115,
+116,
+118,
+119,
+120,
+121,
+122,
+189,
+126,
+149,
+127,
+128,
+129,
+130,
+131,
+132,
+133,
+138,
+134,
+136,
+137,
+139,
+140,
+141,
+212,
+214,
+215,
+216,
+147,
+148,
+150,
+168,
+151,
+154,
+155,
+157,
+183,
+160,
+162,
+163,
+185,
+165,
+171,
+172,
+173,
+222,
+223,
+224,
+225,
+179,
+180,
+182,
+187,
+194,
+195,
+197,
+199,
+201,
+202,
+204,
+205,
+218,
+219,
+220,
+226
+  ],
+  "Globals": {
+    "GlobalCount": 17,
+    "Names": [
+"TRUE",
+"FALSE",
+"true",
+"false",
+"NORTH",
+"SOUTH",
+"EAST",
+"WEST",
+"NORTHEAST",
+"SOUTHEAST",
+"SOUTHWEST",
+"NORTHWEST",
+"Trg",
+"Max",
+"Glue",
+"Start",
+"End"
+    ],
+    "Globals": {
+      "TRUE": null,
+      "FALSE": null,
+      "true": null,
+      "false": null,
+      "NORTH": null,
+      "SOUTH": null,
+      "EAST": null,
+      "WEST": null,
+      "NORTHEAST": null,
+      "SOUTHEAST": null,
+      "SOUTHWEST": null,
+      "NORTHWEST": null,
+      "Trg": null,
+      "Max": null,
+      "Glue": null,
+      "Start": null,
+      "End": null
+    }
+  },
+  "Types": [
+{
+      "Path": "/",
+      "InitProc": 227,
+      "Procs": [
+[
+170,
+217
+        ],
+[
+33
+        ],
+[
+200
+        ],
+[
+1
+        ],
+[
+29
+        ],
+[
+107
+        ],
+[
+0
+        ],
+[
+13
+        ],
+[
+2
+        ],
+[
+60
+        ],
+[
+169
+        ],
+[
+39
+        ],
+[
+190
+        ],
+[
+3
+        ],
+[
+96
+        ],
+[
+61
+        ],
+[
+58
+        ],
+[
+6
+        ],
+[
+4
+        ],
+[
+46
+        ],
+[
+5
+        ],
+[
+10
+        ],
+[
+193
+        ],
+[
+7
+        ],
+[
+54
+        ],
+[
+8
+        ],
+[
+9
+        ],
+[
+159
+        ],
+[
+41
+        ],
+[
+23
+        ],
+[
+196
+        ],
+[
+181
+        ],
+[
+11,
+192
+        ],
+[
+12
+        ],
+[
+43
+        ],
+[
+14
+        ],
+[
+15
+        ],
+[
+16
+        ],
+[
+17
+        ],
+[
+18
+        ],
+[
+19
+        ],
+[
+117
+        ],
+[
+20
+        ],
+[
+21
+        ],
+[
+22
+        ],
+[
+24
+        ],
+[
+45
+        ],
+[
+25
+        ],
+[
+26
+        ],
+[
+40
+        ],
+[
+27
+        ],
+[
+51,
+210
+        ],
+[
+158
+        ],
+[
+28
+        ],
+[
+30
+        ],
+[
+31
+        ],
+[
+32
+        ],
+[
+34
+        ],
+[
+203
+        ],
+[
+35
+        ],
+[
+90
+        ],
+[
+68
+        ],
+[
+36
+        ],
+[
+37
+        ],
+[
+53,
+211
+        ],
+[
+42
+        ],
+[
+38
+        ],
+[
+55
+        ],
+[
+44
+        ],
+[
+47,
+206
+        ],
+[
+48,
+207
+        ],
+[
+156
+        ],
+[
+143,
+213
+        ],
+[
+49,
+208
+        ],
+[
+50,
+209
+        ],
+[
+62
+        ],
+[
+105
+        ],
+[
+52
+        ],
+[
+164
+        ],
+[
+152
+        ],
+[
+56
+        ],
+[
+166
+        ],
+[
+57
+        ],
+[
+59
+        ],
+[
+63
+        ],
+[
+124
+        ],
+[
+64
+        ],
+[
+65
+        ],
+[
+66
+        ],
+[
+167
+        ],
+[
+67
+        ],
+[
+69
+        ],
+[
+70
+        ],
+[
+71
+        ],
+[
+72
+        ],
+[
+123,
+188
+        ],
+[
+73
+        ],
+[
+74
+        ],
+[
+75
+        ],
+[
+76
+        ],
+[
+77
+        ],
+[
+78
+        ],
+[
+198
+        ],
+[
+174,
+221
+        ],
+[
+79
+        ],
+[
+113
+        ],
+[
+80
+        ],
+[
+81
+        ],
+[
+82
+        ],
+[
+83
+        ],
+[
+84
+        ],
+[
+85
+        ],
+[
+153
+        ],
+[
+86
+        ],
+[
+87
+        ],
+[
+88
+        ],
+[
+89,
+184
+        ],
+[
+91
+        ],
+[
+92
+        ],
+[
+191
+        ],
+[
+93
+        ],
+[
+94
+        ],
+[
+95
+        ],
+[
+97
+        ],
+[
+98
+        ],
+[
+99
+        ],
+[
+100
+        ],
+[
+101,
+186
+        ],
+[
+102
+        ],
+[
+103
+        ],
+[
+104
+        ],
+[
+106
+        ],
+[
+108
+        ],
+[
+109
+        ],
+[
+135
+        ],
+[
+110
+        ],
+[
+111
+        ],
+[
+112
+        ],
+[
+161
+        ],
+[
+114
+        ],
+[
+115
+        ],
+[
+116
+        ],
+[
+118
+        ],
+[
+119
+        ],
+[
+120
+        ],
+[
+121
+        ],
+[
+122
+        ],
+[
+125,
+189
+        ],
+[
+126
+        ],
+[
+149
+        ],
+[
+127
+        ],
+[
+128
+        ],
+[
+129
+        ],
+[
+130
+        ],
+[
+131
+        ],
+[
+132
+        ],
+[
+133
+        ],
+[
+138
+        ],
+[
+134
+        ],
+[
+136
+        ],
+[
+137
+        ],
+[
+139
+        ],
+[
+140
+        ],
+[
+141
+        ],
+[
+142,
+212
+        ],
+[
+144,
+214
+        ],
+[
+145,
+215
+        ],
+[
+146,
+216
+        ],
+[
+147
+        ],
+[
+148
+        ],
+[
+150
+        ],
+[
+168
+        ],
+[
+151
+        ],
+[
+154
+        ],
+[
+155
+        ],
+[
+157
+        ],
+[
+183
+        ],
+[
+160
+        ],
+[
+162
+        ],
+[
+163
+        ],
+[
+185
+        ],
+[
+165
+        ],
+[
+171
+        ],
+[
+172
+        ],
+[
+173
+        ],
+[
+175,
+222
+        ],
+[
+176,
+223
+        ],
+[
+177,
+224
+        ],
+[
+178,
+225
+        ],
+[
+179
+        ],
+[
+180
+        ],
+[
+182
+        ],
+[
+187
+        ],
+[
+194
+        ],
+[
+195
+        ],
+[
+197
+        ],
+[
+199
+        ],
+[
+201
+        ],
+[
+202
+        ],
+[
+204
+        ],
+[
+205
+        ],
+[
+218
+        ],
+[
+219
+        ],
+[
+220
+        ],
+[
+226
+        ]
+      ],
+      "Variables": {
+        "global": null,
+        "SEE_TURFS": 16,
+        "SEE_OBJS": 8,
+        "x": 5,
+        "SEE_BLACKNESS": 1024,
+        "health": null,
+        "SEE_SELF": 32,
+        "SEE_INFRA": 64,
+        "SEE_THRU": 512,
+        "SEE_PIXELS": 256,
+        "name": null,
+        "flags": null,
+        "y": 10
+      }
+    }
+  ],
+  "Procs": [
+{
+      "OwningTypeId": 0,
+      "Name": "abs",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "A",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 2
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "addtext",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 3
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "alert",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Usr",
+          "Type": 0
+        },
+{
+          "Name": "Message",
+          "Type": 0
+        },
+{
+          "Name": "Title",
+          "Type": 0
+        },
+{
+          "Name": "Button1",
+          "Type": 0
+        },
+{
+          "Name": "Button2",
+          "Type": 0
+        },
+{
+          "Name": "Button3",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 4
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "animate",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Object",
+          "Type": 0
+        },
+{
+          "Name": "time",
+          "Type": 0
+        },
+{
+          "Name": "loop",
+          "Type": 0
+        },
+{
+          "Name": "easing",
+          "Type": 0
+        },
+{
+          "Name": "flags",
+          "Type": 0
+        },
+{
+          "Name": "delay",
+          "Type": 0
+        },
+{
+          "Name": "pixel_x",
+          "Type": 0
+        },
+{
+          "Name": "pixel_y",
+          "Type": 0
+        },
+{
+          "Name": "pixel_z",
+          "Type": 0
+        },
+{
+          "Name": "maptext",
+          "Type": 0
+        },
+{
+          "Name": "maptext_width",
+          "Type": 0
+        },
+{
+          "Name": "maptext_height",
+          "Type": 0
+        },
+{
+          "Name": "maptext_x",
+          "Type": 0
+        },
+{
+          "Name": "maptext_y",
+          "Type": 0
+        },
+{
+          "Name": "dir",
+          "Type": 0
+        },
+{
+          "Name": "alpha",
+          "Type": 0
+        },
+{
+          "Name": "transform",
+          "Type": 0
+        },
+{
+          "Name": "color",
+          "Type": 0
+        },
+{
+          "Name": "luminosity",
+          "Type": 0
+        },
+{
+          "Name": "infra_luminosity",
+          "Type": 0
+        },
+{
+          "Name": "layer",
+          "Type": 0
+        },
+{
+          "Name": "glide_size",
+          "Type": 0
+        },
+{
+          "Name": "icon",
+          "Type": 0
+        },
+{
+          "Name": "icon_state",
+          "Type": 0
+        },
+{
+          "Name": "invisibility",
+          "Type": 0
+        },
+{
+          "Name": "suffix",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 5
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "arglist",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "args",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 6
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "arccos",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "X",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 7
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "arcsin",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "X",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 8
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "arctan",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "X",
+          "Type": 0
+        },
+{
+          "Name": "Y",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 9
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "ascii2text",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "N",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 10
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "ASSERT",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "condition",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 11
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "block",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Start",
+          "Type": 0
+        },
+{
+          "Name": "End",
+          "Type": 0
+        },
+{
+          "Name": "StartX",
+          "Type": 0
+        },
+{
+          "Name": "StartY",
+          "Type": 0
+        },
+{
+          "Name": "StartZ",
+          "Type": 0
+        },
+{
+          "Name": "EndX",
+          "Type": 0
+        },
+{
+          "Name": "EndY",
+          "Type": 0
+        },
+{
+          "Name": "EndZ",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 12
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "bound_pixloc",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Atom",
+          "Type": 0
+        },
+{
+          "Name": "Dir",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 13
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "bounds",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Ref",
+          "Type": 0
+        },
+{
+          "Name": "Dist",
+          "Type": 0
+        },
+{
+          "Name": "x_offset",
+          "Type": 0
+        },
+{
+          "Name": "y_offset",
+          "Type": 0
+        },
+{
+          "Name": "extra_width",
+          "Type": 0
+        },
+{
+          "Name": "extra_height",
+          "Type": 0
+        },
+{
+          "Name": "x",
+          "Type": 0
+        },
+{
+          "Name": "y",
+          "Type": 0
+        },
+{
+          "Name": "width",
+          "Type": 0
+        },
+{
+          "Name": "height",
+          "Type": 0
+        },
+{
+          "Name": "z",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 14
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "bounds_dist",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Ref",
+          "Type": 0
+        },
+{
+          "Name": "Target",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 15
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "browse",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Body",
+          "Type": 0
+        },
+{
+          "Name": "Options",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 16
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "browse_rsc",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "File",
+          "Type": 0
+        },
+{
+          "Name": "FileName",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 17
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "call",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "proc",
+          "Type": 0
+        },
+{
+          "Name": "",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 18
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "call_ext",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "LibName",
+          "Type": 0
+        },
+{
+          "Name": "FuncName",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 19
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "ceil",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "A",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 20
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "ckey",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Key",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 21
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "ckeyEx",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Text",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 22
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "clamp",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Value",
+          "Type": 0
+        },
+{
+          "Name": "Low",
+          "Type": 0
+        },
+{
+          "Name": "High",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 23
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "cmptext",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 24
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "cmptextEx",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 25
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "copytext",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "T",
+          "Type": 0
+        },
+{
+          "Name": "Start",
+          "Type": 0
+        },
+{
+          "Name": "End",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 26
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "copytext_char",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "T",
+          "Type": 0
+        },
+{
+          "Name": "Start",
+          "Type": 0
+        },
+{
+          "Name": "End",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 27
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "cos",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "X",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 28
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "CRASH",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "msg",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 29
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "fcopy",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Src",
+          "Type": 0
+        },
+{
+          "Name": "Dst",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 30
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "fcopy_rsc",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "File",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 31
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "fdel",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "File",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 32
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "EXCEPTION",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "message",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 33
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "fexists",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "File",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 34
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "file",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Path",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 35
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "file2text",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "File",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 36
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "filter",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "type",
+          "Type": 0
+        },
+{
+          "Name": "",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 37
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "findtext",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Haystack",
+          "Type": 0
+        },
+{
+          "Name": "Needle",
+          "Type": 0
+        },
+{
+          "Name": "Start",
+          "Type": 0
+        },
+{
+          "Name": "End",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 38
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "findtextEx",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Haystack",
+          "Type": 0
+        },
+{
+          "Name": "Needle",
+          "Type": 0
+        },
+{
+          "Name": "Start",
+          "Type": 0
+        },
+{
+          "Name": "End",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 39
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "findlasttext",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Haystack",
+          "Type": 0
+        },
+{
+          "Name": "Needle",
+          "Type": 0
+        },
+{
+          "Name": "Start",
+          "Type": 0
+        },
+{
+          "Name": "End",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 40
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "findlasttextEx",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Haystack",
+          "Type": 0
+        },
+{
+          "Name": "Needle",
+          "Type": 0
+        },
+{
+          "Name": "Start",
+          "Type": 0
+        },
+{
+          "Name": "End",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 41
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "flick",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Icon",
+          "Type": 0
+        },
+{
+          "Name": "Object",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 42
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "flist",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Path",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 43
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "floor",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "A",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 44
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "fract",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "n",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 45
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "ftp",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "File",
+          "Type": 0
+        },
+{
+          "Name": "Name",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 46
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "ftime",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "File",
+          "Type": 0
+        },
+{
+          "Name": "IsCreationTime",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 47
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "generator",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "type",
+          "Type": 0
+        },
+{
+          "Name": "A",
+          "Type": 0
+        },
+{
+          "Name": "B",
+          "Type": 0
+        },
+{
+          "Name": "rand",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 48
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "get_dir",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Loc1",
+          "Type": 0
+        },
+{
+          "Name": "Loc2",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 49
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "get_dist",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Loc1",
+          "Type": 0
+        },
+{
+          "Name": "Loc2",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 50
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "get_step",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Ref",
+          "Type": 0
+        },
+{
+          "Name": "Dir",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 51
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "get_step_away",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Ref",
+          "Type": 0
+        },
+{
+          "Name": "Trg",
+          "Type": 0
+        },
+{
+          "Name": "Max",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 52
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "get_step_rand",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Ref",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 53
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "get_step_to",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Ref",
+          "Type": 0
+        },
+{
+          "Name": "Trg",
+          "Type": 0
+        },
+{
+          "Name": "Min",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 54
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "get_step_towards",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Ref",
+          "Type": 0
+        },
+{
+          "Name": "Trg",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 55
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "get_steps_to",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Ref",
+          "Type": 0
+        },
+{
+          "Name": "Trg",
+          "Type": 0
+        },
+{
+          "Name": "Min",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 56
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "gradient",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "A",
+          "Type": 0
+        },
+{
+          "Name": "index",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 57
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "hascall",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Object",
+          "Type": 0
+        },
+{
+          "Name": "ProcName",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 58
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "hearers",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Depth",
+          "Type": 0
+        },
+{
+          "Name": "Center",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 59
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "html_decode",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "HtmlText",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 60
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "html_encode",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "PlainText",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 61
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "icon",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "icon",
+          "Type": 0
+        },
+{
+          "Name": "icon_state",
+          "Type": 0
+        },
+{
+          "Name": "dir",
+          "Type": 0
+        },
+{
+          "Name": "frame",
+          "Type": 0
+        },
+{
+          "Name": "moving",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 62
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "icon_states",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Icon",
+          "Type": 0
+        },
+{
+          "Name": "mode",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 63
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "image",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "icon",
+          "Type": 0
+        },
+{
+          "Name": "loc",
+          "Type": 0
+        },
+{
+          "Name": "icon_state",
+          "Type": 0
+        },
+{
+          "Name": "layer",
+          "Type": 0
+        },
+{
+          "Name": "dir",
+          "Type": 0
+        },
+{
+          "Name": "pixel_x",
+          "Type": 0
+        },
+{
+          "Name": "pixel_y",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 64
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "initial",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Var",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 65
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "isarea",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 66
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "isfile",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "File",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 67
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "isicon",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Icon",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 68
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "isinf",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "n",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 69
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "islist",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Object",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 70
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "isloc",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 71
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "ismob",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 72
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "isobj",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 73
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "ismovable",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 74
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "isnan",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "n",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 75
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "isnull",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Val",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 76
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "isnum",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Val",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 77
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "ispath",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Val",
+          "Type": 0
+        },
+{
+          "Name": "Type",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 78
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "ispointer",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Value",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 79
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "issaved",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Var",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 80
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "istext",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Val",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 81
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "isturf",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 82
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "istype",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Val",
+          "Type": 0
+        },
+{
+          "Name": "Type",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 83
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "json_decode",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "JSON",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 84
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "json_encode",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Value",
+          "Type": 0
+        },
+{
+          "Name": "flags",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 85
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "length_char",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "E",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 86
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "lerp",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "A",
+          "Type": 0
+        },
+{
+          "Name": "B",
+          "Type": 0
+        },
+{
+          "Name": "factor",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 87
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "link",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "url",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 88
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "list2params",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "List",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 89
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "load_ext",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "LibName",
+          "Type": 0
+        },
+{
+          "Name": "FuncName",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 90
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "load_resource",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 91
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "log",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "X",
+          "Type": 0
+        },
+{
+          "Name": "Base",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 92
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "lowertext",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "T",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 93
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "matrix",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "a",
+          "Type": 0
+        },
+{
+          "Name": "b",
+          "Type": 0
+        },
+{
+          "Name": "c",
+          "Type": 0
+        },
+{
+          "Name": "d",
+          "Type": 0
+        },
+{
+          "Name": "e",
+          "Type": 0
+        },
+{
+          "Name": "f",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 94
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "max",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "A",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 95
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "md5",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "T",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 96
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "min",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "A",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 97
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "nameof",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "x",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 98
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "noise_hash",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 99
+        }
+      ],
+      "Bytecode": [56,0,0,0,63,16],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "newlist",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 102
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "nonspantext",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Haystack",
+          "Type": 0
+        },
+{
+          "Name": "Needles",
+          "Type": 0
+        },
+{
+          "Name": "Start",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 103
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "num2text",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "N",
+          "Type": 0
+        },
+{
+          "Name": "A",
+          "Type": 0
+        },
+{
+          "Name": "B",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 104
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "obounds",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Ref",
+          "Type": 0
+        },
+{
+          "Name": "Dist",
+          "Type": 0
+        },
+{
+          "Name": "x_offset",
+          "Type": 0
+        },
+{
+          "Name": "y_offset",
+          "Type": 0
+        },
+{
+          "Name": "extra_width",
+          "Type": 0
+        },
+{
+          "Name": "extra_height",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 105
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "orange",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Dist",
+          "Type": 0
+        },
+{
+          "Name": "Center",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 106
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "oview",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Dist",
+          "Type": 0
+        },
+{
+          "Name": "Center",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 107
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "oviewers",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Depth",
+          "Type": 0
+        },
+{
+          "Name": "Center",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 108
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "ohearers",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Depth",
+          "Type": 0
+        },
+{
+          "Name": "Center",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 109
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "output",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Msg",
+          "Type": 0
+        },
+{
+          "Name": "Control",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 110
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "params2list",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Params",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 111
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "pick",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 112
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "pixloc",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "x",
+          "Type": 0
+        },
+{
+          "Name": "y",
+          "Type": 0
+        },
+{
+          "Name": "z",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 113
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "prob",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "P",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 114
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "rand",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "L",
+          "Type": 0
+        },
+{
+          "Name": "H",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 115
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "rand_seed",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Seed",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 116
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "range",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Dist",
+          "Type": 0
+        },
+{
+          "Name": "Center",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 117
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "ref",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Object",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 118
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "regex",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "pattern",
+          "Type": 0
+        },
+{
+          "Name": "flags",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 119
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "REGEX_QUOTE",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "text",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 120
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "replacetext",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Haystack",
+          "Type": 0
+        },
+{
+          "Name": "Needle",
+          "Type": 0
+        },
+{
+          "Name": "Replacement",
+          "Type": 0
+        },
+{
+          "Name": "Start",
+          "Type": 0
+        },
+{
+          "Name": "End",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 121
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "replacetextEx",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Haystack",
+          "Type": 0
+        },
+{
+          "Name": "Needle",
+          "Type": 0
+        },
+{
+          "Name": "Replacement",
+          "Type": 0
+        },
+{
+          "Name": "Start",
+          "Type": 0
+        },
+{
+          "Name": "End",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 122
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "rgb",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "R",
+          "Type": 0
+        },
+{
+          "Name": "G",
+          "Type": 0
+        },
+{
+          "Name": "B",
+          "Type": 0
+        },
+{
+          "Name": "A",
+          "Type": 0
+        },
+{
+          "Name": "space",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 123
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "rgb2num",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "color",
+          "Type": 0
+        },
+{
+          "Name": "space",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 124
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "roll",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "ndice",
+          "Type": 0
+        },
+{
+          "Name": "sides",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 125
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "round",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "A",
+          "Type": 0
+        },
+{
+          "Name": "B",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 126
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "run",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "file",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 127
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "sha1",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "input",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 128
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "shell",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "command",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 129
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "shutdown",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Addr",
+          "Type": 0
+        },
+{
+          "Name": "Natural",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 130
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "sign",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "A",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 131
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "sin",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "X",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 132
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "sleep",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Delay",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 133
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "sorttext",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 134
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "sorttextEx",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 135
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "sound",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "file",
+          "Type": 0
+        },
+{
+          "Name": "repeat",
+          "Type": 0
+        },
+{
+          "Name": "wait",
+          "Type": 0
+        },
+{
+          "Name": "channel",
+          "Type": 0
+        },
+{
+          "Name": "volume",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 136
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "spantext",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Haystack",
+          "Type": 0
+        },
+{
+          "Name": "Needles",
+          "Type": 0
+        },
+{
+          "Name": "Start",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 137
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "spantext_char",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Haystack",
+          "Type": 0
+        },
+{
+          "Name": "Needles",
+          "Type": 0
+        },
+{
+          "Name": "Start",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 138
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "splicetext",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Text",
+          "Type": 0
+        },
+{
+          "Name": "Start",
+          "Type": 0
+        },
+{
+          "Name": "End",
+          "Type": 0
+        },
+{
+          "Name": "Insert",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 139
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "splicetext_char",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Text",
+          "Type": 0
+        },
+{
+          "Name": "Start",
+          "Type": 0
+        },
+{
+          "Name": "End",
+          "Type": 0
+        },
+{
+          "Name": "Insert",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 140
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "splittext",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Text",
+          "Type": 0
+        },
+{
+          "Name": "Delimiter",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 141
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "sqrt",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "A",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 142
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "stat",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Name",
+          "Type": 0
+        },
+{
+          "Name": "Value",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 143
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "statpanel",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Panel",
+          "Type": 0
+        },
+{
+          "Name": "Name",
+          "Type": 0
+        },
+{
+          "Name": "Value",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 144
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "startup",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 145
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "step",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Ref",
+          "Type": 0
+        },
+{
+          "Name": "Dir",
+          "Type": 0
+        },
+{
+          "Name": "Speed",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 146
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "step_away",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Ref",
+          "Type": 0
+        },
+{
+          "Name": "Trg",
+          "Type": 0
+        },
+{
+          "Name": "Max",
+          "Type": 0
+        },
+{
+          "Name": "Speed",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 147
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "step_rand",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Ref",
+          "Type": 0
+        },
+{
+          "Name": "Speed",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 148
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "step_to",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Ref",
+          "Type": 0
+        },
+{
+          "Name": "Trg",
+          "Type": 0
+        },
+{
+          "Name": "Min",
+          "Type": 0
+        },
+{
+          "Name": "Speed",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 149
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "step_towards",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Ref",
+          "Type": 0
+        },
+{
+          "Name": "Trg",
+          "Type": 0
+        },
+{
+          "Name": "Speed",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 150
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "tan",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "X",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 151
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "text2ascii",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "T",
+          "Type": 0
+        },
+{
+          "Name": "pos",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 152
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "text2ascii_char",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "T",
+          "Type": 0
+        },
+{
+          "Name": "pos",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 153
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "text2file",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Text",
+          "Type": 0
+        },
+{
+          "Name": "File",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 154
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "text2num",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "T",
+          "Type": 0
+        },
+{
+          "Name": "radix",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 155
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "text2path",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "T",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 156
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "time2text",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "timestamp",
+          "Type": 0
+        },
+{
+          "Name": "format",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 157
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "trimtext",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Text",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 158
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "trunc",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "n",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 159
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "turn",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Dir",
+          "Type": 0
+        },
+{
+          "Name": "Angle",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 160
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "typesof",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Item1",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 161
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "uppertext",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "T",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 162
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "url_decode",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "UrlText",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 163
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "url_encode",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "PlainText",
+          "Type": 0
+        },
+{
+          "Name": "format",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 164
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "vector",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "x",
+          "Type": 0
+        },
+{
+          "Name": "y",
+          "Type": 0
+        },
+{
+          "Name": "z",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 165
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "values_cut_over",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Alist",
+          "Type": 0
+        },
+{
+          "Name": "Max",
+          "Type": 0
+        },
+{
+          "Name": "inclusive",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 166
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "values_cut_under",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Alist",
+          "Type": 0
+        },
+{
+          "Name": "Min",
+          "Type": 0
+        },
+{
+          "Name": "inclusive",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 167
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "values_dot",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "A",
+          "Type": 0
+        },
+{
+          "Name": "B",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 168
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "values_product",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Alist",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 169
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "values_sum",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Alist",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 170
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "view",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Dist",
+          "Type": 0
+        },
+{
+          "Name": "Center",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 171
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "viewers",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Depth",
+          "Type": 0
+        },
+{
+          "Name": "Center",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 172
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "walk",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Ref",
+          "Type": 0
+        },
+{
+          "Name": "Dir",
+          "Type": 0
+        },
+{
+          "Name": "Lag",
+          "Type": 0
+        },
+{
+          "Name": "Speed",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 173
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "walk_away",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Ref",
+          "Type": 0
+        },
+{
+          "Name": "Trg",
+          "Type": 0
+        },
+{
+          "Name": "Max",
+          "Type": 0
+        },
+{
+          "Name": "Lag",
+          "Type": 0
+        },
+{
+          "Name": "Speed",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 174
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "walk_rand",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Ref",
+          "Type": 0
+        },
+{
+          "Name": "Lag",
+          "Type": 0
+        },
+{
+          "Name": "Speed",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 175
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "walk_to",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Ref",
+          "Type": 0
+        },
+{
+          "Name": "Trg",
+          "Type": 0
+        },
+{
+          "Name": "Min",
+          "Type": 0
+        },
+{
+          "Name": "Lag",
+          "Type": 0
+        },
+{
+          "Name": "Speed",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 176
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "walk_towards",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Ref",
+          "Type": 0
+        },
+{
+          "Name": "Trg",
+          "Type": 0
+        },
+{
+          "Name": "Lag",
+          "Type": 0
+        },
+{
+          "Name": "Speed",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 177
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "winclone",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "player",
+          "Type": 0
+        },
+{
+          "Name": "window_name",
+          "Type": 0
+        },
+{
+          "Name": "clone_name",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 178
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "winexists",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "player",
+          "Type": 0
+        },
+{
+          "Name": "control_id",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 179
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "winget",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "player",
+          "Type": 0
+        },
+{
+          "Name": "control_id",
+          "Type": 0
+        },
+{
+          "Name": "params",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 180
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "winset",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "player",
+          "Type": 0
+        },
+{
+          "Name": "control_id",
+          "Type": 0
+        },
+{
+          "Name": "params",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 181
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "set_background",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "mode",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 182
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "eval",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "script",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 11
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "findlasttext_char",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Haystack",
+          "Type": 0
+        },
+{
+          "Name": "Needle",
+          "Type": 0
+        },
+{
+          "Name": "Start",
+          "Type": 0
+        },
+{
+          "Name": "End",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 14
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "findlasttextEx_char",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Haystack",
+          "Type": 0
+        },
+{
+          "Name": "Needle",
+          "Type": 0
+        },
+{
+          "Name": "Start",
+          "Type": 0
+        },
+{
+          "Name": "End",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 16
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "findtext_char",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Haystack",
+          "Type": 0
+        },
+{
+          "Name": "Needle",
+          "Type": 0
+        },
+{
+          "Name": "Start",
+          "Type": 0
+        },
+{
+          "Name": "End",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 18
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "findtextEx_char",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Haystack",
+          "Type": 0
+        },
+{
+          "Name": "Needle",
+          "Type": 0
+        },
+{
+          "Name": "Start",
+          "Type": 0
+        },
+{
+          "Name": "End",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 20
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "load_resource",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "File",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 22
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "missile",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Type",
+          "Type": 0
+        },
+{
+          "Name": "Start",
+          "Type": 0
+        },
+{
+          "Name": "End",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 24
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "obounds",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Ref",
+          "Type": 0
+        },
+{
+          "Name": "Dist",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 26
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "replacetext_char",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Haystack",
+          "Type": 0
+        },
+{
+          "Name": "Needle",
+          "Type": 0
+        },
+{
+          "Name": "Replacement",
+          "Type": 0
+        },
+{
+          "Name": "Start",
+          "Type": 0
+        },
+{
+          "Name": "End",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 28
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "run",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "File",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 30
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "shell",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "command",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 32
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "nonspantext_char",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Haystack",
+          "Type": 0
+        },
+{
+          "Name": "Needles",
+          "Type": 0
+        },
+{
+          "Name": "Start",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 34
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "splittext_char",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Text",
+          "Type": 0
+        },
+{
+          "Name": "Start",
+          "Type": 0
+        },
+{
+          "Name": "End",
+          "Type": 0
+        },
+{
+          "Name": "Insert",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 36
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "bound_pixloc",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Atom",
+          "Type": 0
+        },
+{
+          "Name": "Dir",
+          "Type": 32
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 38
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "_dm_db_new_con",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 41
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "_dm_db_connect",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 43
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "_dm_db_close",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 45
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "_dm_db_is_connected",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 47
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "_dm_db_quote",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 49
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "_dm_db_new_query",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 51
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "_dm_db_execute",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 53
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "_dm_db_next_row",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 55
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "_dm_db_rows_affected",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 57
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "_dm_db_row_count",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 59
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "_dm_db_error_msg",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 61
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "_dm_db_columns",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 63
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "replacetextEx_char",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Haystack",
+          "Type": 0
+        },
+{
+          "Name": "Needle",
+          "Type": 0
+        },
+{
+          "Name": "Replacement",
+          "Type": 0
+        },
+{
+          "Name": "Start",
+          "Type": 0
+        },
+{
+          "Name": "End",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 214
+        }
+      ],
+      "Bytecode": [6,28,0,16],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "get_dir",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Loc1",
+          "Type": 0
+        },
+{
+          "Name": "Loc2",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 220
+        }
+      ],
+      "Bytecode": [56,0,0,0,0,16],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "get_dist",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Loc1",
+          "Type": 0
+        },
+{
+          "Name": "Loc2",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 224
+        }
+      ],
+      "Bytecode": [6,28,0,10,11,74,0,0,0,1,1,0,0,0,6,28,1,10,11,74,0,0,0,1,1,0,0,0,47,12,0,0,0,0,56,0,0,254,66,16,6,28,0,6,28,1,15,12,0,0,0,0,56,0,0,128,191,16,6,28,1,104,0,0,0,0,6,28,0,104,0,0,0,0,18,9,9,2,6,28,1,104,1,0,0,0,6,28,0,104,1,0,0,0,18,9,9,3,6,28,2,17,40,128,10,11,122,0,0,0,1,1,0,0,0,16,56,0,0,0,64,6,28,3,17,40,8,81,56,0,0,0,64,81,17,81,17,81],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "get_step",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Ref",
+          "Type": 0
+        },
+{
+          "Name": "Dir",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 232
+        }
+      ],
+      "Bytecode": [17,16],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "get_step_away",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Ref",
+          "Type": 0
+        },
+{
+          "Name": "Trg",
+          "Type": 0
+        },
+{
+          "Name": "Max",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 236
+        }
+      ],
+      "Bytecode": [6,28,0,6,28,1,119,56,0,0,52,67,10,11,156,0,0,0,1,2,0,0,0,9,9,3,6,28,0,6,28,3,117,16],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "get_step_rand",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Ref",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 240
+        }
+      ],
+      "Bytecode": [56,0,0,128,63,56,0,0,0,64,56,0,0,128,64,56,0,0,0,65,56,0,0,160,64,84,5,9,9,1,6,28,0,6,28,1,117,16],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "get_step_towards",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Ref",
+          "Type": 0
+        },
+{
+          "Name": "Trg",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 245
+        }
+      ],
+      "Bytecode": [6,28,0,6,28,1,119,9,9,2,6,28,0,6,28,2,117,16],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "step",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Ref",
+          "Type": 0
+        },
+{
+          "Name": "Dir",
+          "Type": 0
+        },
+{
+          "Name": "Speed",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 249
+        }
+      ],
+      "Bytecode": [6,28,0,6,28,0,6,28,1,117,6,28,1,106,0,0,0,0,1,2,0,0,0,16],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "step_away",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Ref",
+          "Type": 0
+        },
+{
+          "Name": "Trg",
+          "Type": 0
+        },
+{
+          "Name": "Max",
+          "Type": 0
+        },
+{
+          "Name": "Speed",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 253
+        }
+      ],
+      "Bytecode": [6,28,0,6,28,0,6,28,1,6,28,2,10,11,209,0,0,0,1,3,0,0,0,6,28,0,6,28,1,119,56,0,0,52,67,10,11,156,0,0,0,1,2,0,0,0,106,0,0,0,0,1,2,0,0,0,16],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "step_rand",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Ref",
+          "Type": 0
+        },
+{
+          "Name": "Speed",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 256
+        }
+      ],
+      "Bytecode": [6,28,0,10,11,210,0,0,0,1,1,0,0,0,9,9,2,6,28,0,6,28,2,6,28,0,6,28,2,119,106,0,0,0,0,1,2,0,0,0,16],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "step_to",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Ref",
+          "Type": 0
+        },
+{
+          "Name": "Trg",
+          "Type": 0
+        },
+{
+          "Name": "Min",
+          "Type": 0
+        },
+{
+          "Name": "Speed",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 260
+        }
+      ],
+      "Bytecode": [6,28,0,6,28,1,10,11,207,0,0,0,1,2,0,0,0,9,9,4,6,28,4,6,28,2,29,12,0,0,0,0,56,0,0,0,0,16,6,28,0,6,28,1,119,9,9,5,6,28,0,6,28,5,6,28,3,10,11,212,0,0,0,1,3,0,0,0,16],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "step_towards",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Ref",
+          "Type": 0
+        },
+{
+          "Name": "Trg",
+          "Type": 0
+        },
+{
+          "Name": "Speed",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 267
+        }
+      ],
+      "Bytecode": [6,28,0,6,28,0,6,28,1,10,11,211,0,0,0,1,2,0,0,0,6,28,0,6,28,1,119,106,0,0,0,0,1,2,0,0,0,16],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "walk_away",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Ref",
+          "Type": 0
+        },
+{
+          "Name": "Trg",
+          "Type": 0
+        },
+{
+          "Name": "Max",
+          "Type": 0
+        },
+{
+          "Name": "Lag",
+          "Type": 0
+        },
+{
+          "Name": "Speed",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 270
+        }
+      ],
+      "Bytecode": [3,0,0,0,0,10,11,27,0,0,0,1,1,0,0,0,81],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "jointext",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "List",
+          "Type": 0
+        },
+{
+          "Name": "Glue",
+          "Type": 0
+        },
+{
+          "Name": "Start",
+          "Type": 0
+        },
+{
+          "Name": "End",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 274
+        }
+      ],
+      "Bytecode": [6,28,0,10,11,68,0,0,0,1,1,0,0,0,12,0,0,0,0,6,28,0,6,28,1,6,28,2,6,28,3,106,0,0,0,0,1,3,0,0,0,16,6,28,0,10,11,79,0,0,0,1,1,0,0,0,12,0,0,0,0,6,28,0,16,3,1,0,0,0,10,11,27,0,0,0,1,1,0,0,0,81],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "lentext",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "T",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 281
+        }
+      ],
+      "Bytecode": [6,28,0,118,16],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "winshow",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "player",
+          "Type": 0
+        },
+{
+          "Name": "window",
+          "Type": 0
+        },
+{
+          "Name": "show",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 284
+        }
+      ],
+      "Bytecode": [6,28,0,6,28,1,3,0,0,0,0,10,11,224,0,0,0,1,3,0,0,0,81,95,2,0,0,0,81,3,1,0,0,0,81,3,1,0,0,0,81,95,3,0,0,0,81,3,2,0,0,0,81,3,2,0,0,0,81,17,81],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "winclone",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "player",
+          "Type": 0
+        },
+{
+          "Name": "window_name",
+          "Type": 0
+        },
+{
+          "Name": "clone_name",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 287
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "winexists",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "player",
+          "Type": 0
+        },
+{
+          "Name": "control_id",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 290
+        }
+      ],
+      "Bytecode": [56,0,0,0,0,16],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "winget",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "player",
+          "Type": 0
+        },
+{
+          "Name": "control_id",
+          "Type": 0
+        },
+{
+          "Name": "params",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 294
+        }
+      ],
+      "Bytecode": [3,0,0,0,0,16],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "winset",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "player",
+          "Type": 0
+        },
+{
+          "Name": "control_id",
+          "Type": 0
+        },
+{
+          "Name": "params",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 298
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "set_background",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "mode",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 301
+        }
+      ],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "refcount",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "Arguments": [
+{
+          "Name": "Object",
+          "Type": 0
+        }
+      ],
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 304
+        }
+      ],
+      "Bytecode": [56,0,0,200,66,16],
+      "IsVerb": false
+    },
+{
+      "OwningTypeId": 0,
+      "Name": "__init__",
+      "Attributes": 0,
+      "MaxStackSize": 0,
+      "SourceInfo": [
+{
+          "Offset": 0,
+          "Line": 0
+        }
+      ],
+      "IsVerb": false
+    }
+  ],
+  "OptionalErrors": {
+
+  }
+}

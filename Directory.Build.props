@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <!-- Empty file to prevent parent Directory.Build.props from being imported -->
+  <!-- This is a C++ project, not a .NET project -->
+</Project>

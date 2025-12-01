@@ -1,0 +1,6 @@
+// Simple test environment
+#include "test.dm"
+
+world
+    name = "Test World"
+    mob = /mob/player
