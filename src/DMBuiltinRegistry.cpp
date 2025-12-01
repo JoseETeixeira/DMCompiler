@@ -403,6 +403,9 @@ void DMBuiltinRegistry::RegisterTypeProcs() {
     RegisterProcForType("/world", ProcSignature("GetConfig", {"Key"}, DMValueType::Anything));
     RegisterProcForType("/world", ProcSignature("SetConfig", {"Key", "Value"}, DMValueType::Anything));
     RegisterProcForType("/world", ProcSignature("OpenPort", {"Port"}, DMValueType::Num));
+    RegisterProcForType("/world", ProcSignature("IsBanned", {"Key", "Address", "ComputerID", "Type"}, DMValueType::Num));
+    RegisterProcForType("/world", ProcSignature("Tick", {}, DMValueType::Null));
+    RegisterProcForType("/world", ProcSignature("Error", {"Exception"}, DMValueType::Null));
     
     // /client procs
     RegisterProcForType("/client", ProcSignature("New", {"Topic"}, DMValueType::Null));
@@ -417,6 +420,8 @@ void DMBuiltinRegistry::RegisterTypeProcs() {
     RegisterProcForType("/client", ProcSignature("MouseDrop", {"SrcObject", "OverObject", "SrcLocation", "OverLocation", "SrcControl", "OverControl", "Params"}, DMValueType::Null));
     RegisterProcForType("/client", ProcSignature("MouseEntered", {"Object", "Location", "Control", "Params"}, DMValueType::Null));
     RegisterProcForType("/client", ProcSignature("MouseExited", {"Object", "Location", "Control", "Params"}, DMValueType::Null));
+    RegisterProcForType("/client", ProcSignature("MouseMove", {"Object", "Location", "Control", "Params"}, DMValueType::Null));
+    RegisterProcForType("/client", ProcSignature("MouseWheel", {"Object", "DeltaX", "DeltaY", "Location", "Control", "Params"}, DMValueType::Null));
     RegisterProcForType("/client", ProcSignature("Move", {"Loc", "Dir"}, DMValueType::Num));
     RegisterProcForType("/client", ProcSignature("North", {}, DMValueType::Null));
     RegisterProcForType("/client", ProcSignature("South", {}, DMValueType::Null));
@@ -429,6 +434,11 @@ void DMBuiltinRegistry::RegisterTypeProcs() {
     RegisterProcForType("/client", ProcSignature("Center", {}, DMValueType::Null));
     RegisterProcForType("/client", ProcSignature("Import", {}, DMValueType::Anything));
     RegisterProcForType("/client", ProcSignature("Export", {"File"}, DMValueType::Anything));
+    RegisterProcForType("/client", ProcSignature("Command", {"Command"}, DMValueType::Null));
+    RegisterProcForType("/client", ProcSignature("AllowUpload", {"Filename", "Filelength"}, DMValueType::Num));
+    RegisterProcForType("/client", ProcSignature("SoundQuery", {}, DMValueType::Num));
+    RegisterProcForType("/client", ProcSignature("MeasureText", {"Text", "Style", "Width"}, DMValueType::Anything));
+    RegisterProcForType("/client", ProcSignature("RenderIcon", {"Object"}, DMValueType::Anything));
     
     // /datum procs
     RegisterProcForType("/datum", ProcSignature("New", {"..."}, DMValueType::Null, true));
@@ -525,6 +535,21 @@ void DMBuiltinRegistry::RegisterBuiltinVars() {
     RegisterVarForType("/world", "view", DMValueType::Num);
     RegisterVarForType("/world", "contents", DMValueType::Anything);
     RegisterVarForType("/world", "log", DMValueType::Anything);
+    RegisterVarForType("/world", "cpu", DMValueType::Num);
+    RegisterVarForType("/world", "loop_checks", DMValueType::Num);
+    RegisterVarForType("/world", "movement_mode", DMValueType::Num);
+    RegisterVarForType("/world", "internet_address", DMValueType::Text);
+    RegisterVarForType("/world", "url", DMValueType::Text);
+    RegisterVarForType("/world", "visibility", DMValueType::Num);
+    RegisterVarForType("/world", "status", DMValueType::Text);
+    RegisterVarForType("/world", "map_cpu", DMValueType::Num);
+    RegisterVarForType("/world", "map_format", DMValueType::Num);
+    RegisterVarForType("/world", "reachable", DMValueType::Num);
+    RegisterVarForType("/world", "byond_version", DMValueType::Num);
+    RegisterVarForType("/world", "byond_build", DMValueType::Num);
+    RegisterVarForType("/world", "address", DMValueType::Text);
+    RegisterVarForType("/world", "port", DMValueType::Num);
+    RegisterVarForType("/world", "system_type", DMValueType::Num);
 
     // /atom variables
     RegisterVarForType("/atom", "x", DMValueType::Num);
@@ -559,6 +584,33 @@ void DMBuiltinRegistry::RegisterBuiltinVars() {
     RegisterVarForType("/client", "images", DMValueType::Anything);
     RegisterVarForType("/client", "lazy_eye", DMValueType::Num);
     RegisterVarForType("/client", "dir", DMValueType::Num);
+    RegisterVarForType("/client", "statobj", DMValueType::Anything);
+    RegisterVarForType("/client", "statpanel", DMValueType::Text);
+    RegisterVarForType("/client", "edge_limit", DMValueType::Anything);
+    RegisterVarForType("/client", "pixel_x", DMValueType::Num);
+    RegisterVarForType("/client", "pixel_y", DMValueType::Num);
+    RegisterVarForType("/client", "pixel_z", DMValueType::Num);
+    RegisterVarForType("/client", "pixel_w", DMValueType::Num);
+    RegisterVarForType("/client", "show_verb_panel", DMValueType::Num);
+    RegisterVarForType("/client", "authenticate", DMValueType::Num);
+    RegisterVarForType("/client", "CGI", DMValueType::Anything);
+    RegisterVarForType("/client", "command_text", DMValueType::Text);
+    RegisterVarForType("/client", "inactivity", DMValueType::Num);
+    RegisterVarForType("/client", "tick_lag", DMValueType::Num);
+    RegisterVarForType("/client", "show_map", DMValueType::Num);
+    RegisterVarForType("/client", "script", DMValueType::Anything);
+    RegisterVarForType("/client", "color", DMValueType::Anything);
+    RegisterVarForType("/client", "control_freak", DMValueType::Num);
+    RegisterVarForType("/client", "mouse_pointer_icon", DMValueType::Anything);
+    RegisterVarForType("/client", "preload_rsc", DMValueType::Num);
+    RegisterVarForType("/client", "fps", DMValueType::Num);
+    RegisterVarForType("/client", "glide_size", DMValueType::Num);
+    RegisterVarForType("/client", "virtual_eye", DMValueType::Anything);
+    RegisterVarForType("/client", "bounds", DMValueType::Anything);
+    RegisterVarForType("/client", "bound_x", DMValueType::Num);
+    RegisterVarForType("/client", "bound_y", DMValueType::Num);
+    RegisterVarForType("/client", "bound_width", DMValueType::Num);
+    RegisterVarForType("/client", "bound_height", DMValueType::Num);
 
     // /datum variables
     RegisterVarForType("/datum", "type", DMValueType::Path);

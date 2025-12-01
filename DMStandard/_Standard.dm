@@ -222,22 +222,6 @@ proc/replacetextEx_char(Haystack, Needle, Replacement, Start = 1, End = 0) as te
 
 // Spatial/Movement proc implementations
 
-proc/get_dir(Loc1, Loc2) as num
-	set opendream_unimplemented = TRUE
-	return 0
-
-proc/get_dist(Loc1, Loc2) as num
-	if (isnull(Loc1) || isnull(Loc2)) return 127
-	if (Loc1 == Loc2) return -1
-
-	var/distX = Loc2.x - Loc1.x
-	var/distY = Loc2.y - Loc1.y
-	return round(sqrt(distX ** 2 + distY ** 2))
-
-proc/get_step(Ref, Dir)
-	set opendream_unimplemented = TRUE
-	return null
-
 proc/get_step_away(Ref, Trg, Max = 5)
 	var/dir = turn(get_dir(Ref, Trg), 180)
 	return get_step(Ref, dir)
@@ -252,7 +236,9 @@ proc/get_step_towards(Ref, Trg)
 	return get_step(Ref, dir)
 
 proc/step(Ref, Dir, Speed=0) as num
-	//TODO: Speed = step_size if Speed is 0
+	if (Speed == 0 && ismovable(Ref))
+		var/atom/movable/AM = Ref
+		Speed = AM.step_size
 	return Ref.Move(get_step(Ref, Dir), Dir)
 
 proc/step_away(Ref, Trg, Max=5, Speed=0) as num
@@ -272,10 +258,6 @@ proc/step_to(Ref, Trg, Min = 0, Speed = 0) as num
 proc/step_towards(Ref, Trg, Speed=0) as num
 	return Ref.Move(get_step_towards(Ref, Trg), get_dir(Ref, Trg))
 
-/proc/walk_away(Ref, Trg, Max=5, Lag=0, Speed=0)
-	set opendream_unimplemented = TRUE
-	CRASH("/walk_away() is not implemented")
-
 proc/jointext(List, Glue, Start = 1, End = 0) as text
 	if(islist(List))
 		return List.Join(Glue, Start, End)
@@ -288,23 +270,6 @@ proc/lentext(T) as num
 
 proc/winshow(player, window, show=1)
 	winset(player, window, "is-visible=[show ? "true" : "false"]")
-
-proc/winclone(player, window_name, clone_name)
-	set opendream_unimplemented = TRUE
-
-proc/winexists(player, control_id) as num
-	set opendream_unimplemented = TRUE
-	return 0
-
-proc/winget(player, control_id, params) as text
-	set opendream_unimplemented = TRUE
-	return ""
-
-proc/winset(player, control_id, params)
-	set opendream_unimplemented = TRUE
-
-proc/set_background(mode)
-	set opendream_unimplemented = TRUE
 
 proc/refcount(var/Object) as num
 	// woah that's a lot of refs
