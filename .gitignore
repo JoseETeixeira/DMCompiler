@@ -47,3 +47,5 @@ Thumbs.db
 Examples/
 docs/
 .kiro/
+*.obj
+.sconsign.dblite
