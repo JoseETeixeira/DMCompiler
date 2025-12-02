@@ -568,9 +568,10 @@ std::unique_ptr<DMASTExpression> DMParser::ComparisonExpression() {
     auto left = ShiftExpression();
     
     // Left-associative: keep consuming while we see comparison operators
-    // Handles: ==, !=, <, >, <=, >=
+    // Handles: ==, !=, <, >, <=, >=, in
     while (IsInSet(Current().Type, ComparisonTypes_) || 
-           IsInSet(Current().Type, LtGtComparisonTypes_)) {
+           IsInSet(Current().Type, LtGtComparisonTypes_) ||
+           Current().Type == TokenType::In) {
         Location loc = CurrentLocation();
         BinaryOperator op = TokenTypeToBinaryOp(Current().Type);
         Advance();
@@ -771,7 +772,7 @@ std::unique_ptr<DMASTExpression> DMParser::PostfixExpression() {
             Consume(TokenType::RightBracket, "Expected ']' after array index");
             
             // Array indexing is represented as dereference with the index as the property
-            expr = std::make_unique<DMASTDereference>(loc, std::move(expr), DereferenceType::Direct, std::move(index));
+            expr = std::make_unique<DMASTDereference>(loc, std::move(expr), DereferenceType::Index, std::move(index));
         }
         // Post-increment: x++
         else if (Current().Type == TokenType::Increment) {

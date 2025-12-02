@@ -4,7 +4,6 @@
 #include "DreamProcOpcode.h"
 #include "DMBuiltinRegistry.h"
 #include <iostream>
-#include <typeinfo>
 
 namespace DMCompiler {
 
@@ -445,11 +444,11 @@ bool DMExpressionCompiler::CompileDereference(DMASTDereference* expr) {
     }
     
     // Check if this is field access (obj.field) or indexing (list[index])
-    // Field access: Property is an identifier
-    // Indexing: Property is any other expression (e.g., integer, variable)
+    // Field access: Property is an identifier AND not explicitly an index
+    // Indexing: Property is any other expression OR explicitly an index
     auto* propIdent = dynamic_cast<DMASTIdentifier*>(expr->Property.get());
     
-    if (propIdent) {
+    if (propIdent && expr->Type != DereferenceType::Index) {
         // Field access: obj.field
         // Emit DereferenceField opcode with field name (pops object, pushes field value, net 0)
         Writer_->EmitString(DreamProcOpcode::DereferenceField, propIdent->Identifier);
@@ -1149,8 +1148,19 @@ DMExpressionCompiler::LValueInfo DMExpressionCompiler::ResolveLValue(DMASTExpres
     info.Type = LValueInfo::Kind::Invalid;
     info.NeedsStackTarget = false;
 
+    if (!expr) {
+        return info;
+    }
+
+    if (auto* assign = dynamic_cast<DMASTAssign*>(expr)) {
+        // Handle (A=B) = C by resolving A
+        // This is a workaround for some parser oddities or loose DM syntax
+        return ResolveLValue(assign->LValue.get());
+    }
+
     if (auto* ident = dynamic_cast<DMASTIdentifier*>(expr)) {
         std::string name = ident->Identifier;
+        // std::cout << "ResolveLValue: Identifier '" << name << "'" << std::endl;
         
         // Check for special identifiers
         if (name == ".") {
@@ -1234,7 +1244,7 @@ DMExpressionCompiler::LValueInfo DMExpressionCompiler::ResolveLValue(DMASTExpres
     else if (auto* deref = dynamic_cast<DMASTDereference*>(expr)) {
         auto* propIdent = dynamic_cast<DMASTIdentifier*>(deref->Property.get());
         
-        if (propIdent) {
+        if (propIdent && deref->Type != DereferenceType::Index) {
             // Field access: obj.field
             int stringId = Compiler_->GetObjectTree()->AddString(propIdent->Identifier);
             info.Type = LValueInfo::Kind::Field;

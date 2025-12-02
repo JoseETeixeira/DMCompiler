@@ -281,7 +281,8 @@ enum class DereferenceType {
     Direct,       // .
     Search,       // :
     Safe,         // ?.
-    SafeSearch    // ?:
+    SafeSearch,   // ?:
+    Index         // []
 };
 
 class DMASTDereference : public DMASTExpression {
