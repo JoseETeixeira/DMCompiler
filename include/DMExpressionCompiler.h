@@ -42,6 +42,7 @@ public:
         Kind Type;
         std::vector<uint8_t> ReferenceBytes;  // For Local/Global/Field
         bool NeedsStackTarget;  // For Field/Index (target already on stack)
+        bool IsConst = false;   // Is this LValue a const variable?
     };
     
     /// <summary>

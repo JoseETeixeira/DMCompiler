@@ -69,6 +69,8 @@ enum class WarningCode {
     MalformedMacro,
     UnsupportedTypeCheck,
     UnknownVariable,
+    FinalVarOverride,
+    DMStandardModification,
     Unknown
 };
 

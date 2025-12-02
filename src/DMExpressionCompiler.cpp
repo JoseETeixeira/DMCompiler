@@ -1009,6 +1009,12 @@ bool DMExpressionCompiler::CompileAssign(DMASTAssign* expr) {
         return false;
     }
 
+    // Check for const reassignment
+    if (info.IsConst) {
+        Compiler_->Emit(WarningCode::WriteToConstant, expr->Location_, "Cannot assign to const variable");
+        // We continue compilation but emit the error
+    }
+
     switch (info.Type) {
         case LValueInfo::Kind::Local:
             return CompileLocalAssignment(info, expr->Value.get(), expr->Operator);
@@ -1147,6 +1153,7 @@ DMExpressionCompiler::LValueInfo DMExpressionCompiler::ResolveLValue(DMASTExpres
     LValueInfo info;
     info.Type = LValueInfo::Kind::Invalid;
     info.NeedsStackTarget = false;
+    info.IsConst = false;
 
     if (!expr) {
         return info;
@@ -1194,6 +1201,9 @@ DMExpressionCompiler::LValueInfo DMExpressionCompiler::ResolveLValue(DMASTExpres
         if (localVar) {
             info.Type = LValueInfo::Kind::Local;
             info.ReferenceBytes = { 9, static_cast<uint8_t>(localVar->Id) };
+            if (dynamic_cast<LocalConstVariable*>(localVar)) {
+                info.IsConst = true;
+            }
             return info;
         }
         
@@ -1204,6 +1214,7 @@ DMExpressionCompiler::LValueInfo DMExpressionCompiler::ResolveLValue(DMASTExpres
                 int stringId = Compiler_->GetObjectTree()->AddString(name);
                 info.Type = LValueInfo::Kind::Field;
                 info.NeedsStackTarget = false; // Implicit src
+                info.IsConst = field->IsConst;
                 info.ReferenceBytes = { 11 }; // SrcField
                 info.ReferenceBytes.push_back(stringId & 0xFF);
                 info.ReferenceBytes.push_back((stringId >> 8) & 0xFF);
@@ -1217,6 +1228,7 @@ DMExpressionCompiler::LValueInfo DMExpressionCompiler::ResolveLValue(DMASTExpres
         int globalId = Compiler_->GetObjectTree()->GetGlobalVariableId(name);
         if (globalId != -1) {
             info.Type = LValueInfo::Kind::Global;
+            info.IsConst = Compiler_->GetObjectTree()->Globals[globalId].IsConst;
             info.ReferenceBytes = { 10 };
             info.ReferenceBytes.push_back(globalId & 0xFF);
             info.ReferenceBytes.push_back((globalId >> 8) & 0xFF);

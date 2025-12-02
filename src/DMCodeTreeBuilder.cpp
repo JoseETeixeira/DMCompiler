@@ -107,6 +107,15 @@ void DMCodeTreeBuilder::ProcessStatement(DMASTStatement* statement, const DreamP
     }
     // Variable definition: var/name = value
     else if (auto* varDef = dynamic_cast<DMASTObjectVarDefinition*>(statement)) {
+        // Check for DMStandard modification
+        if (DMStandardFinalized_) {
+            DMObject* obj = ObjectTree_->GetType(currentType);
+            if (obj && obj->IsFromDMStandard) {
+                Compiler_->Emit(WarningCode::DMStandardModification, varDef->Location_, 
+                    "Modifying DMStandard type '" + currentType.ToString() + "' by adding variable '" + varDef->Name + "'");
+            }
+        }
+
         // Add the variable to the current type
         // The variable's name is stored in varDef->Name
         // The variable's type constraint (if any) is in varDef->TypePath
@@ -115,6 +124,32 @@ void DMCodeTreeBuilder::ProcessStatement(DMASTStatement* statement, const DreamP
     }
     // Variable override: existing_var = new_value
     else if (auto* varOverride = dynamic_cast<DMASTObjectVarOverride*>(statement)) {
+        // Check for DMStandard modification
+        if (DMStandardFinalized_) {
+            DMObject* obj = ObjectTree_->GetType(currentType);
+            if (obj && obj->IsFromDMStandard) {
+                Compiler_->Emit(WarningCode::DMStandardModification, varOverride->Location_, 
+                    "Modifying DMStandard type '" + currentType.ToString() + "' by overriding variable '" + varOverride->VarName + "'");
+            }
+        }
+
+        // Check for FinalVarOverride
+        DMObject* currentObj = ObjectTree_->GetType(currentType);
+        if (currentObj) {
+            DMObject* search = currentObj;
+            while (search) {
+                auto it = search->Variables.find(varOverride->VarName);
+                if (it != search->Variables.end()) {
+                    if (it->second.IsFinal) {
+                        Compiler_->Emit(WarningCode::FinalVarOverride, varOverride->Location_, 
+                            "Cannot override final variable '" + varOverride->VarName + "'");
+                    }
+                    break;
+                }
+                search = search->Parent;
+            }
+        }
+
         // Variable overrides apply to the current type
         ObjectTree_->AddType(currentType);
         ObjectTree_->AddObjectVarOverride(currentType, varOverride);
@@ -123,6 +158,15 @@ void DMCodeTreeBuilder::ProcessStatement(DMASTStatement* statement, const DreamP
     else if (auto* procDef = dynamic_cast<DMASTObjectProcDefinition*>(statement)) {
         DreamPath procOwner = currentType.Combine(procDef->ObjectPath);
         
+        // Check for DMStandard modification
+        if (DMStandardFinalized_) {
+            DMObject* obj = ObjectTree_->GetType(procOwner);
+            if (obj && obj->IsFromDMStandard) {
+                Compiler_->Emit(WarningCode::DMStandardModification, procDef->Location_, 
+                    "Modifying DMStandard type '" + procOwner.ToString() + "' by adding/overriding proc '" + procDef->Name + "'");
+            }
+        }
+
         // Add the type that owns this proc
         ObjectTree_->AddType(procOwner);
         
