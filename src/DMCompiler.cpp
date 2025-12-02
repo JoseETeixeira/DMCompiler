@@ -570,6 +570,18 @@ bool DMCompiler::ProcessVarDefinition(DMASTObjectVarDefinition* varDef, const Dr
         std::cout << "    Actual object path: " << actualObjectPath.ToString() << std::endl;
     }
     
+    // Parse modifiers from the type path
+    if (Settings_.Verbose) {
+        std::cout << "    Parsing modifiers from: " << varDef->TypePath.Path.ToString() << std::endl;
+    }
+    VarModifiers mods = VarModifiers::Parse(varDef->TypePath.Path);
+    if (Settings_.Verbose) {
+        std::cout << "    Parsed modifiers: IsConst=" << mods.IsConst 
+                  << ", IsGlobal=" << mods.IsGlobal 
+                  << ", IsTmp=" << mods.IsTmp 
+                  << ", IsFinal=" << mods.IsFinal << std::endl;
+    }
+    
     // Check if this is a global variable (defined on /global)
     if (actualObjectPath.ToString() == "/global") {
         // This is a global variable - add to Globals vector instead of object variables
@@ -579,11 +591,12 @@ bool DMCompiler::ProcessVarDefinition(DMASTObjectVarDefinition* varDef, const Dr
         
         DMVariable var;
         var.Name = varDef->Name;
-        var.IsConst = false;
-        var.IsFinal = false;
+        var.IsConst = mods.IsConst;
+        var.IsFinal = mods.IsFinal;
         var.IsGlobal = true;  // Mark as global
-        var.IsTmp = false;
+        var.IsTmp = mods.IsTmp;
         var.Value = varDef->Value.get();  // Store the default value expression (non-owning pointer)
+        var.Type = mods.TypePath;
         
         // Add to the Globals vector
         ObjectTree_->Globals.push_back(var);
@@ -610,11 +623,12 @@ bool DMCompiler::ProcessVarDefinition(DMASTObjectVarDefinition* varDef, const Dr
     // Create the variable
     DMVariable var;
     var.Name = varDef->Name;
-    var.IsConst = false;
-    var.IsFinal = false;
-    var.IsGlobal = false;
-    var.IsTmp = false;
+    var.IsConst = mods.IsConst;
+    var.IsFinal = mods.IsFinal;
+    var.IsGlobal = mods.IsGlobal;
+    var.IsTmp = mods.IsTmp;
     var.Value = varDef->Value.get();  // Store the default value expression (non-owning pointer)
+    var.Type = mods.TypePath;
     
     // Add to the Variables map
     obj->Variables[varDef->Name] = var;

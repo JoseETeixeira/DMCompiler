@@ -47,7 +47,7 @@ DMLexer::DMLexer(const std::string& sourceName, const std::string& source, bool 
 }
 
 Token DMLexer::ParseNextToken() {
-    if (AtEndOfSource_) {
+    if (AtEndOfSource_ || CurrentIndex_ >= Source_.size()) {
         return CreateToken(TokenType::EndOfFile, "");
     }
     

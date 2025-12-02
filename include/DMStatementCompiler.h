@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace DMCompiler {
 
@@ -41,6 +42,7 @@ private:
     
     // Named label tracking (for label:/goto statements)
     std::unordered_map<std::string, std::string> NamedLabels_;
+    std::unordered_set<std::string> DefinedLabels_;
     
     // Forward reference tracking for goto statements
     struct ForwardReference {

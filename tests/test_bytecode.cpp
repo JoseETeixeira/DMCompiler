@@ -388,7 +388,7 @@ bool TestListEnumerator() {
     assert(bytecode.size() == 5);  // 1 byte opcode + 4 bytes enumerator ID
     
     // Check opcode
-    assert(bytecode[0] == 0x40);  // CreateListEnumerator
+    assert(bytecode[0] == 0x3A);  // CreateListEnumerator
     
     // Check enumerator ID
     int32_t emittedEnumeratorId = bytecode[1] | (bytecode[2] << 8) | (bytecode[3] << 16) | (static_cast<int32_t>(bytecode[4]) << 24);

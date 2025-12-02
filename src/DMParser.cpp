@@ -2583,9 +2583,12 @@ std::unique_ptr<DMASTObjectStatement> DMParser::ObjectStatement() {
         }
         
         // Check for newline/semicolon -> variable definition without initialization (in var block)
+        // Special case: if path is exactly "var", treat as object definition (block start)
+        bool isVarKeyword = path.Path.GetElements().size() == 1 && path.Path.GetElements()[0] == "var";
+
         if ((Current().Type == TokenType::Newline || 
              Current().Type == TokenType::Semicolon ||
-             Current().Type == TokenType::EndOfFile) && inVarBlock) {
+             Current().Type == TokenType::EndOfFile) && inVarBlock && !isVarKeyword) {
             // Variable definition without initialization
             // For "Beam/myBeam", path is "Beam/myBeam"
             // Variable name is the last element: "myBeam"
@@ -2645,7 +2648,13 @@ DMASTPath DMParser::ParsePath() {
            Current().Type == TokenType::Global ||
            Current().Type == TokenType::Var ||
            Current().Type == TokenType::Proc ||
-           Current().Type == TokenType::Verb) {
+           Current().Type == TokenType::Verb ||
+           Current().Type == TokenType::Const ||
+           Current().Type == TokenType::Tmp ||
+           Current().Type == TokenType::Static) {
+        // DEBUG
+        // std::cout << "ParsePath consuming: " << Current().Text << " (" << (int)Current().Type << ")" << std::endl;
+        
         elements.push_back(Current().Text);
         Advance();
         

@@ -219,10 +219,10 @@ void TestNullConditionalOperators() {
 
 void TestNewTokensInContext() {
     // Test new tokens in a realistic context
-    std::string source = "obj?.var ?: default\na ||= b\nlist?[0]";
+    std::string source = "obj?.myVar ?: myDefault\na ||= b\nlist?[0]";
     DMLexer lexer("test.dm", source);
     
-    // Line 1: obj?.var ?: default
+    // Line 1: obj?.myVar ?: myDefault
     Token tok1 = lexer.GetNextToken();
     assert(tok1.Type == TokenType::Identifier);
     assert(tok1.Text == "obj");
@@ -232,14 +232,14 @@ void TestNewTokensInContext() {
     
     Token tok3 = lexer.GetNextToken();
     assert(tok3.Type == TokenType::Identifier);
-    assert(tok3.Text == "var");
+    assert(tok3.Text == "myVar");
     
     Token tok4 = lexer.GetNextToken();
     assert(tok4.Type == TokenType::QuestionColon);
     
     Token tok5 = lexer.GetNextToken();
     assert(tok5.Type == TokenType::Identifier);
-    assert(tok5.Text == "default");
+    assert(tok5.Text == "myDefault");
     
     Token newline1 = lexer.GetNextToken();
     assert(newline1.Type == TokenType::Newline);

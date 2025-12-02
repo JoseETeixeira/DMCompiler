@@ -64,7 +64,7 @@ bool CompileDMCode(const std::string& code) {
     // Create compiler settings
     DMCompiler::DMCompilerSettings settings;
     settings.Files.push_back(tempFile);
-    settings.Verbose = false;
+    settings.Verbose = false; // Enable verbose for debugging
     settings.SuppressUnimplementedWarnings = true;
     settings.NoStandard = true;
     

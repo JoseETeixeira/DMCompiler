@@ -125,7 +125,8 @@ TEST(VarBlockWithTypedVariable) {
     
     // Check that the type is "Beam" (relative path, shown as ".Beam")
     EXPECT_TRUE(var->Type.has_value());
-    EXPECT_EQ(var->Type.value().ToString(), ".Beam");
+    // The compiler resolves top-level types to absolute paths
+    EXPECT_EQ(var->Type.value().ToString(), "/Beam");
 }
 
 // Test 3: Var block with list syntax (techs[0])
@@ -193,7 +194,8 @@ TEST(NestedVarBlocks) {
     auto* ownerVar = beamObj->GetVariable("owner");
     EXPECT_NE(ownerVar, nullptr);
     EXPECT_TRUE(ownerVar->Type.has_value());
-    EXPECT_EQ(ownerVar->Type.value().ToString(), ".mob");
+    // The compiler resolves top-level types to absolute paths
+    EXPECT_EQ(ownerVar->Type.value().ToString(), "/mob");
 }
 
 // Test 6: Var block with absolute type path

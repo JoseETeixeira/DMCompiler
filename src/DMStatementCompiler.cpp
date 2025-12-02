@@ -1041,6 +1041,7 @@ bool DMStatementCompiler::CompileLabel(DMASTProcStatementLabel* stmt) {
     
     // Store the mapping from the name to the generated label
     NamedLabels_[stmt->Name] = generatedLabel;
+    DefinedLabels_.insert(stmt->Name);
     
     // Emit the label at this position
     EmitLabel(generatedLabel);
@@ -1126,9 +1127,9 @@ bool DMStatementCompiler::Finalize() {
     
     for (const auto& forwardRef : ForwardReferences_) {
         // Look up the label to see if it was ever defined
-        auto it = NamedLabels_.find(forwardRef.LabelName);
+        auto it = DefinedLabels_.find(forwardRef.LabelName);
         
-        if (it == NamedLabels_.end()) {
+        if (it == DefinedLabels_.end()) {
             // Label was never defined - this is an error
             Compiler_->ForcedError(
                 Location::Internal,

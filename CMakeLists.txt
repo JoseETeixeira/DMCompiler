@@ -18,11 +18,25 @@ option(BUILD_DISASSEMBLER "Build disassembler tool" ON)
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
 # Third-party libraries
-find_package(nlohmann_json 3.2.0)
+find_package(nlohmann_json 3.2.0 QUIET)
 if(NOT nlohmann_json_FOUND)
-    message(STATUS "nlohmann_json not found, will use embedded version")
-    # You can download single-header version from: https://github.com/nlohmann/json
-    include_directories(${CMAKE_SOURCE_DIR}/third_party)
+    message(STATUS "nlohmann_json not found, downloading single-header version...")
+    
+    set(JSON_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/third_party/nlohmann)
+    file(MAKE_DIRECTORY ${JSON_INCLUDE_DIR})
+    
+    if(NOT EXISTS ${JSON_INCLUDE_DIR}/json.hpp)
+        file(DOWNLOAD 
+            https://github.com/nlohmann/json/releases/download/v3.11.3/json.hpp
+            ${JSON_INCLUDE_DIR}/json.hpp
+            SHOW_PROGRESS
+        )
+    endif()
+    
+    # Create an interface library for consistency
+    add_library(nlohmann_json INTERFACE)
+    target_include_directories(nlohmann_json INTERFACE ${CMAKE_SOURCE_DIR}/third_party)
+    add_library(nlohmann_json::nlohmann_json ALIAS nlohmann_json)
 endif()
 
 # Compiler library
@@ -81,7 +95,7 @@ if(BUILD_DISASSEMBLER)
         src/disassembler_main.cpp
         src/DMDisassembler.cpp
     )
-    target_link_libraries(dmdisasm PRIVATE DMCompilerLib)
+    target_link_libraries(dmdisasm PRIVATE DMCompilerLib nlohmann_json::nlohmann_json)
 endif()
 
 # Tests

@@ -2,6 +2,8 @@
 #include <fstream>
 #include <string>
 #include <vector>
+#include <sstream>
+#include <algorithm>
 #include "DMDisassembler.h"
 
 // Disassembler main program

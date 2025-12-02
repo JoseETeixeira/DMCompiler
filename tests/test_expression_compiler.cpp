@@ -867,8 +867,10 @@ bool TestCompileGlobalProcCallSimple() {
     DMCompiler::DMProc proc(0, "test_proc", &testObj, false, DMCompiler::Location());
     DMCompiler::DMExpressionCompiler exprCompiler(&compiler, &proc, &writer);
     
-    // Register "sleep" as global proc ID 42
-    compiler.GetObjectTree()->RegisterGlobalProc("sleep", 42);
+    // Create "sleep" proc and register it
+    auto* sleepProc = compiler.GetObjectTree()->CreateProc("sleep", nullptr, false, DMCompiler::Location());
+    int sleepId = sleepProc->Id;
+    compiler.GetObjectTree()->RegisterGlobalProc("sleep", sleepId);
     
     // Create AST: sleep(10)
     auto procIdent = std::make_unique<DMCompiler::DMASTIdentifier>(DMCompiler::Location(), "sleep");
@@ -894,11 +896,13 @@ bool TestCompileGlobalProcCallSimple() {
     assert(bytecode[0] == static_cast<uint8_t>(DMCompiler::DreamProcOpcode::PushFloat));
     assert(bytecode[5] == static_cast<uint8_t>(DMCompiler::DreamProcOpcode::Call));
     assert(bytecode[6] == 11 && "Should have GlobalProc type (11)");
-    // Proc ID (42) stored as little-endian int: 0x2A 0x00 0x00 0x00
-    assert(bytecode[7] == 0x2A);
-    assert(bytecode[8] == 0x00);
-    assert(bytecode[9] == 0x00);
-    assert(bytecode[10] == 0x00);
+    
+    // Proc ID stored as little-endian int
+    assert(bytecode[7] == (sleepId & 0xFF));
+    assert(bytecode[8] == ((sleepId >> 8) & 0xFF));
+    assert(bytecode[9] == ((sleepId >> 16) & 0xFF));
+    assert(bytecode[10] == ((sleepId >> 24) & 0xFF));
+    
     assert(bytecode[11] == 1 && "Args type should be FromStack (1)");
     // Arg count (1) stored as little-endian int: 0x01 0x00 0x00 0x00
     assert(bytecode[12] == 0x01);
@@ -920,8 +924,10 @@ bool TestCompileGlobalProcCallMultipleArgs() {
     DMCompiler::DMProc proc(0, "test_proc", &testObj, false, DMCompiler::Location());
     DMCompiler::DMExpressionCompiler exprCompiler(&compiler, &proc, &writer);
     
-    // Register "rand" as global proc ID 99
-    compiler.GetObjectTree()->RegisterGlobalProc("rand", 99);
+    // Create "rand" proc and register it
+    auto* randProc = compiler.GetObjectTree()->CreateProc("rand", nullptr, false, DMCompiler::Location());
+    int randId = randProc->Id;
+    compiler.GetObjectTree()->RegisterGlobalProc("rand", randId);
     
     // Create AST: rand(1, 100)
     auto procIdent = std::make_unique<DMCompiler::DMASTIdentifier>(DMCompiler::Location(), "rand");
@@ -948,8 +954,13 @@ bool TestCompileGlobalProcCallMultipleArgs() {
     assert(bytecode[5] == static_cast<uint8_t>(DMCompiler::DreamProcOpcode::PushFloat));
     assert(bytecode[10] == static_cast<uint8_t>(DMCompiler::DreamProcOpcode::Call));
     assert(bytecode[11] == 11 && "Should have GlobalProc type (11)");
-    // Proc ID (99) = 0x63
-    assert(bytecode[12] == 0x63);
+    
+    // Proc ID
+    assert(bytecode[12] == (randId & 0xFF));
+    assert(bytecode[13] == ((randId >> 8) & 0xFF));
+    assert(bytecode[14] == ((randId >> 16) & 0xFF));
+    assert(bytecode[15] == ((randId >> 24) & 0xFF));
+    
     assert(bytecode[16] == 1 && "Args type should be FromStack (1)");
     // Arg count (2) 
     assert(bytecode[17] == 0x02);
@@ -968,8 +979,10 @@ bool TestCompileGlobalProcCallNoArgs() {
     DMCompiler::DMProc proc(0, "test_proc", &testObj, false, DMCompiler::Location());
     DMCompiler::DMExpressionCompiler exprCompiler(&compiler, &proc, &writer);
     
-    // Register "time" as global proc ID 15
-    compiler.GetObjectTree()->RegisterGlobalProc("time", 15);
+    // Create "time" proc and register it
+    auto* timeProc = compiler.GetObjectTree()->CreateProc("time", nullptr, false, DMCompiler::Location());
+    int timeId = timeProc->Id;
+    compiler.GetObjectTree()->RegisterGlobalProc("time", timeId);
     
     // Create AST: time()
     auto procIdent = std::make_unique<DMCompiler::DMASTIdentifier>(DMCompiler::Location(), "time");
@@ -988,8 +1001,13 @@ bool TestCompileGlobalProcCallNoArgs() {
     assert(bytecode.size() == 11 && "No-arg global proc call should emit 11 bytes");
     assert(bytecode[0] == static_cast<uint8_t>(DMCompiler::DreamProcOpcode::Call));
     assert(bytecode[1] == 11 && "Should have GlobalProc type (11)");
-    // Proc ID (15) = 0x0F
-    assert(bytecode[2] == 0x0F);
+    
+    // Proc ID
+    assert(bytecode[2] == (timeId & 0xFF));
+    assert(bytecode[3] == ((timeId >> 8) & 0xFF));
+    assert(bytecode[4] == ((timeId >> 16) & 0xFF));
+    assert(bytecode[5] == ((timeId >> 24) & 0xFF));
+    
     assert(bytecode[6] == 0 && "Args type should be None (0)");
     // Arg count (0)
     assert(bytecode[7] == 0x00);
@@ -1008,8 +1026,10 @@ bool TestCompileGlobalProcInExpression() {
     DMCompiler::DMProc proc(0, "test_proc", &testObj, false, DMCompiler::Location());
     DMCompiler::DMExpressionCompiler exprCompiler(&compiler, &proc, &writer);
     
-    // Register "rand" as global proc ID 99
-    compiler.GetObjectTree()->RegisterGlobalProc("rand", 99);
+    // Create "rand" proc and register it
+    auto* randProc = compiler.GetObjectTree()->CreateProc("rand", nullptr, false, DMCompiler::Location());
+    int randId = randProc->Id;
+    compiler.GetObjectTree()->RegisterGlobalProc("rand", randId);
     
     // Create AST: rand(5) + 10
     auto procIdent = std::make_unique<DMCompiler::DMASTIdentifier>(DMCompiler::Location(), "rand");
@@ -1038,6 +1058,14 @@ bool TestCompileGlobalProcInExpression() {
     assert(bytecode.size() == 22 && "Global proc in expression should emit 22 bytes");
     assert(bytecode[0] == static_cast<uint8_t>(DMCompiler::DreamProcOpcode::PushFloat));
     assert(bytecode[5] == static_cast<uint8_t>(DMCompiler::DreamProcOpcode::Call));
+    
+    // Check GlobalProc ref
+    assert(bytecode[6] == 11);
+    assert(bytecode[7] == (randId & 0xFF));
+    assert(bytecode[8] == ((randId >> 8) & 0xFF));
+    assert(bytecode[9] == ((randId >> 16) & 0xFF));
+    assert(bytecode[10] == ((randId >> 24) & 0xFF));
+    
     assert(bytecode[16] == static_cast<uint8_t>(DMCompiler::DreamProcOpcode::PushFloat));
     assert(bytecode[21] == static_cast<uint8_t>(DMCompiler::DreamProcOpcode::Add));
     
@@ -1989,7 +2017,8 @@ bool TestCompileNewPathNoArgs() {
     std::cout << "  TestCompileNewPathNoArgs... ";
     
     DMCompiler::DMCompiler compiler;
-    DMCompiler::DMObjectTree tree(&compiler);
+    DMCompiler::DMObjectTree* tree = compiler.GetObjectTree();
+    tree->GetOrCreateDMObject(DMCompiler::DreamPath("/obj/item"));
     DMCompiler::DMObject testObj(0, DMCompiler::DreamPath("/mob"));
     DMCompiler::DMProc proc(0, "test_proc", &testObj, false, DMCompiler::Location());
     DMCompiler::BytecodeWriter writer;
@@ -2017,16 +2046,24 @@ bool TestCompileNewPathNoArgs() {
     
     // Should have:
     // - PushType opcode (1 byte: 0x02)
-    // - Type ID (2 bytes: uint16_t)
+    // - Type ID (4 bytes: int32)
     // - CreateObject opcode (1 byte: 0x2E)
     // - Argument type (1 byte: None = 0)
     // - Argument count (1 byte: 0)
-    // Total: 6 bytes
-    assert(bytecode.size() == 6 && "New expression with no args should emit 6 bytes");
+    // Total: 8 bytes
+    if (bytecode.size() != 8) {
+        std::cout << "FAILED: Expected 8 bytes, got " << bytecode.size() << std::endl;
+        std::cout << "Bytecode: ";
+        for (auto b : bytecode) {
+            printf("%02X ", b);
+        }
+        std::cout << std::endl;
+    }
+    assert(bytecode.size() == 8 && "New expression with no args should emit 8 bytes");
     assert(bytecode[0] == static_cast<uint8_t>(DMCompiler::DreamProcOpcode::PushType));
-    assert(bytecode[3] == static_cast<uint8_t>(DMCompiler::DreamProcOpcode::CreateObject));
-    assert(bytecode[4] == static_cast<uint8_t>(DMCompiler::DMCallArgumentsType::None));
-    assert(bytecode[5] == 0); // 0 arguments
+    assert(bytecode[5] == static_cast<uint8_t>(DMCompiler::DreamProcOpcode::CreateObject));
+    assert(bytecode[6] == static_cast<uint8_t>(DMCompiler::DMCallArgumentsType::None));
+    assert(bytecode[7] == 0); // 0 arguments
     
     std::cout << "PASSED" << std::endl;
     return true;
@@ -2037,7 +2074,8 @@ bool TestCompileNewPathWithArgs() {
     std::cout << "  TestCompileNewPathWithArgs... ";
     
     DMCompiler::DMCompiler compiler;
-    DMCompiler::DMObjectTree tree(&compiler);
+    DMCompiler::DMObjectTree* tree = compiler.GetObjectTree();
+    tree->GetOrCreateDMObject(DMCompiler::DreamPath("/mob/player"));
     DMCompiler::DMObject testObj(0, DMCompiler::DreamPath("/mob"));
     DMCompiler::DMProc proc(0, "test_proc", &testObj, false, DMCompiler::Location());
     DMCompiler::BytecodeWriter writer;
@@ -2111,7 +2149,8 @@ bool TestCompileNewPathSimple() {
     std::cout << "  TestCompileNewPathSimple... ";
     
     DMCompiler::DMCompiler compiler;
-    DMCompiler::DMObjectTree tree(&compiler);
+    DMCompiler::DMObjectTree* tree = compiler.GetObjectTree();
+    tree->GetOrCreateDMObject(DMCompiler::DreamPath("/datum"));
     DMCompiler::DMObject testObj(0, DMCompiler::DreamPath("/mob"));
     DMCompiler::DMProc proc(0, "test_proc", &testObj, false, DMCompiler::Location());
     DMCompiler::BytecodeWriter writer;
@@ -2138,9 +2177,9 @@ bool TestCompileNewPathSimple() {
     const auto& bytecode = writer.GetBytecode();
     
     // Same as TestCompileNewPathNoArgs
-    assert(bytecode.size() == 6 && "Simple new expression should emit 6 bytes");
+    assert(bytecode.size() == 8 && "Simple new expression should emit 8 bytes");
     assert(bytecode[0] == static_cast<uint8_t>(DMCompiler::DreamProcOpcode::PushType));
-    assert(bytecode[3] == static_cast<uint8_t>(DMCompiler::DreamProcOpcode::CreateObject));
+    assert(bytecode[5] == static_cast<uint8_t>(DMCompiler::DreamProcOpcode::CreateObject));
     
     std::cout << "PASSED" << std::endl;
     return true;
@@ -2632,7 +2671,7 @@ bool TestCompileListIndexAssignment() {
     auto lvalue = std::make_unique<DMCompiler::DMASTDereference>(
         DMCompiler::Location(),
         std::move(listIdent),
-        DMCompiler::DereferenceType::Direct,
+        DMCompiler::DereferenceType::Index,
         std::move(indexIdent)
     );
     
@@ -2994,7 +3033,7 @@ bool TestCompileNamedArgumentsOnly() {
     
     // Create parameter: a = 5 (named argument)
     std::vector<std::unique_ptr<DMCompiler::DMASTCallParameter>> params;
-    auto keyExpr = std::make_unique<DMCompiler::DMASTConstantString>(DMCompiler::Location(), "a");
+    auto keyExpr = std::make_unique<DMCompiler::DMASTIdentifier>(DMCompiler::Location(), "a");
     auto valueExpr = std::make_unique<DMCompiler::DMASTConstantInteger>(DMCompiler::Location(), 5);
     params.push_back(std::make_unique<DMCompiler::DMASTCallParameter>(
         DMCompiler::Location(),
@@ -3032,11 +3071,11 @@ bool TestCompileNamedArgumentsOnly() {
             assert(argsTypeOffset < bytecode.size() && "Bytecode too short for args type");
             assert(bytecode[argsTypeOffset] == 2 && "Arguments type should be FromStackKeyed (2)");
             
-            // Check argument count is 2 (1 named arg = 2 values: key + value)
+            // Check argument count is 1 (1 named arg)
             size_t argCountOffset = argsTypeOffset + 1;
             assert(argCountOffset + 4 <= bytecode.size() && "Bytecode too short for arg count");
             int32_t argCount = *reinterpret_cast<const int32_t*>(&bytecode[argCountOffset]);
-            assert(argCount == 2 && "Argument count should be 2 for 1 named arg");
+            assert(argCount == 1 && "Argument count should be 1 for 1 named arg");
             break;
         }
     }
@@ -3079,7 +3118,7 @@ bool TestCompileMixedArguments() {
     ));
     
     // Second: named arg b = 2
-    auto keyExpr = std::make_unique<DMCompiler::DMASTConstantString>(DMCompiler::Location(), "b");
+    auto keyExpr = std::make_unique<DMCompiler::DMASTIdentifier>(DMCompiler::Location(), "b");
     auto valueExpr = std::make_unique<DMCompiler::DMASTConstantInteger>(DMCompiler::Location(), 2);
     params.push_back(std::make_unique<DMCompiler::DMASTCallParameter>(
         DMCompiler::Location(),
@@ -3116,11 +3155,11 @@ bool TestCompileMixedArguments() {
             assert(argsTypeOffset < bytecode.size() && "Bytecode too short for args type");
             assert(bytecode[argsTypeOffset] == 2 && "Arguments type should be FromStackKeyed (2)");
             
-            // Check argument count is 3 (1 positional + 1 named = 1 + 2 = 3)
+            // Check argument count is 2 (1 positional + 1 named)
             size_t argCountOffset = argsTypeOffset + 1;
             assert(argCountOffset + 4 <= bytecode.size() && "Bytecode too short for arg count");
             int32_t argCount = *reinterpret_cast<const int32_t*>(&bytecode[argCountOffset]);
-            assert(argCount == 3 && "Argument count should be 3 for 1 positional + 1 named");
+            assert(argCount == 2 && "Argument count should be 2 for 1 positional + 1 named");
             break;
         }
     }
@@ -3282,21 +3321,21 @@ bool TestCompileMultipleNamedArguments() {
     params.push_back(std::make_unique<DMCompiler::DMASTCallParameter>(
         DMCompiler::Location(),
         std::make_unique<DMCompiler::DMASTConstantInteger>(DMCompiler::Location(), 1),
-        std::make_unique<DMCompiler::DMASTConstantString>(DMCompiler::Location(), "a")
+        std::make_unique<DMCompiler::DMASTIdentifier>(DMCompiler::Location(), "a")
     ));
     
     // b = 2
     params.push_back(std::make_unique<DMCompiler::DMASTCallParameter>(
         DMCompiler::Location(),
         std::make_unique<DMCompiler::DMASTConstantInteger>(DMCompiler::Location(), 2),
-        std::make_unique<DMCompiler::DMASTConstantString>(DMCompiler::Location(), "b")
+        std::make_unique<DMCompiler::DMASTIdentifier>(DMCompiler::Location(), "b")
     ));
     
     // c = 3
     params.push_back(std::make_unique<DMCompiler::DMASTCallParameter>(
         DMCompiler::Location(),
         std::make_unique<DMCompiler::DMASTConstantInteger>(DMCompiler::Location(), 3),
-        std::make_unique<DMCompiler::DMASTConstantString>(DMCompiler::Location(), "c")
+        std::make_unique<DMCompiler::DMASTIdentifier>(DMCompiler::Location(), "c")
     ));
     
     auto callExpr = std::make_unique<DMCompiler::DMASTCall>(
@@ -3318,11 +3357,11 @@ bool TestCompileMultipleNamedArguments() {
             assert(argsTypeOffset < bytecode.size() && "Bytecode too short for args type");
             assert(bytecode[argsTypeOffset] == 2 && "Arguments type should be FromStackKeyed (2)");
             
-            // 3 named args = 6 total values (3 keys + 3 values)
+            // 3 named args = 3 logical arguments
             size_t argCountOffset = argsTypeOffset + 1;
             assert(argCountOffset + 4 <= bytecode.size() && "Bytecode too short for arg count");
             int32_t argCount = *reinterpret_cast<const int32_t*>(&bytecode[argCountOffset]);
-            assert(argCount == 6 && "Argument count should be 6 for 3 named args");
+            assert(argCount == 3 && "Argument count should be 3 for 3 named args");
             break;
         }
     }

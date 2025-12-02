@@ -120,6 +120,41 @@ add_test(NAME IstypeVariadicTests COMMAND test_istype_variadic)
 add_test(NAME TypeResolutionTests COMMAND test_type_resolution_driver)
 add_test(NAME ProcResolutionTests COMMAND test_proc_resolution)
 add_test(NAME VarOverrideTests COMMAND test_var_override)
+
+# Standalone var attributes test
+add_executable(test_var_attributes
+    test_var_attributes.cpp
+)
+target_link_libraries(test_var_attributes PRIVATE DMCompilerLib)
+target_include_directories(test_var_attributes PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME VarAttributesTests COMMAND test_var_attributes)
+
+# Standalone lexer tokens test
+add_executable(test_lexer_tokens
+    test_lexer_tokens.cpp
+)
+target_link_libraries(test_lexer_tokens PRIVATE DMCompilerLib)
+target_include_directories(test_lexer_tokens PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME LexerTokensTests COMMAND test_lexer_tokens)
+
+# Standalone bytecode writer test
+add_executable(test_bytecode_writer
+    test_bytecode_writer.cpp
+)
+target_link_libraries(test_bytecode_writer PRIVATE DMCompilerLib)
+target_include_directories(test_bytecode_writer PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME BytecodeWriterTests COMMAND test_bytecode_writer)
+
+# Standalone disassembler test
+# Disabled due to missing nlohmann/json dependency
+# add_executable(test_disassembler
+#     test_disassembler.cpp
+#     ${CMAKE_SOURCE_DIR}/src/DMDisassembler.cpp
+# )
+# target_link_libraries(test_disassembler PRIVATE DMCompilerLib)
+# target_include_directories(test_disassembler PRIVATE ${CMAKE_SOURCE_DIR}/src)
+# add_test(NAME DisassemblerTests COMMAND test_disassembler)
+
 # Disabled: Takes too long to run, not related to core compiler functionality
 # add_test(NAME ExampleCompilationTests COMMAND dm_compiler_tests [examples])
 # set_tests_properties(ExampleCompilationTests PROPERTIES TIMEOUT 60)
