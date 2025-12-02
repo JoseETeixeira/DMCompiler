@@ -283,9 +283,9 @@ DMObject* DMObjectTree::DetermineParent(const DreamPath& path) {
     return nullptr;
 }
 
-std::optional<DreamPath> DMObjectTree::UpwardSearch(const DreamPath& path, const DreamPath& search) {
-    // TODO: Implement full upward search with proc support
-    // For now, implement basic type search
+std::optional<DreamPath> DMObjectTree::UpwardSearch(const DreamPath& path, const DreamPath& search, const std::string& procName) {
+    // Implement full upward search with proc support
+    // This searches up the hierarchy for a matching type or proc
     
     DreamPath currentPath = path;
     
@@ -294,16 +294,34 @@ std::optional<DreamPath> DMObjectTree::UpwardSearch(const DreamPath& path, const
         
         int typeId;
         if (TryGetTypeId(combined, typeId)) {
-            return combined;
+            // If procName is specified, check if this type has the proc
+            if (!procName.empty()) {
+                DMObject* obj = AllObjects[typeId].get();
+                if (obj && obj->HasProc(procName)) {
+                    return combined;
+                }
+                // Type exists but doesn't have the proc - continue searching
+            } else {
+                // Just looking for a type, found it
+                return combined;
+            }
         }
         
-        // Reached root, search failed
-        if (currentPath == DreamPath::Root) {
+        // Reached root (empty elements means root), search failed
+        if (currentPath.GetElements().empty()) {
             break;
         }
         
-        // Move up one level
-        currentPath = currentPath.AddToPath("..");
+        // Move up one level by removing the last element
+        currentPath = currentPath.RemoveLastElement();
+    }
+    
+    // If searching for a proc, also check if it's a global proc
+    if (!procName.empty()) {
+        auto globalIt = GlobalProcs.find(procName);
+        if (globalIt != GlobalProcs.end()) {
+            return DreamPath::Root;  // Global proc found at root
+        }
     }
     
     return std::nullopt;
@@ -377,14 +395,27 @@ void DMObjectTree::AddObjectVar(const DreamPath& owner, DMASTObjectVarDefinition
     // Get or create the owning object
     DMObject* ownerObj = GetOrCreateDMObject(owner);
     
+    // Parse variable modifiers from the type path
+    // In DM, variable paths can contain modifiers like var/const/mob/myvar
+    VarModifiers mods = VarModifiers::Parse(varDef->TypePath.Path);
+    
     // Create a DMVariable from the AST definition
     DMVariable var;
     var.Name = varDef->Name;
-    var.Type = varDef->TypePath.Path;
-    var.IsConst = false;  // TODO: Extract from var definition attributes
-    var.IsFinal = false;   // TODO: Extract from var definition attributes
-    var.IsGlobal = false;  // Object variables are not global
-    var.IsTmp = false;     // TODO: Extract from var definition attributes
+    
+    // Use the parsed type path (without modifiers), or the original if no modifiers found
+    if (mods.TypePath.has_value()) {
+        var.Type = mods.TypePath;
+    } else {
+        // No type constraint after removing modifiers
+        var.Type = std::nullopt;
+    }
+    
+    // Apply extracted modifiers
+    var.IsConst = mods.IsConst;
+    var.IsFinal = mods.IsFinal;
+    var.IsGlobal = mods.IsGlobal || mods.IsStatic;  // Object variables can be global/static
+    var.IsTmp = mods.IsTmp;
     var.Value = varDef->Value.get();  // Store pointer to AST expression (non-owning)
     
     // Set explicit value type from "as" clause if present
@@ -464,6 +495,49 @@ std::vector<DMProc*> DMObjectTree::GetAllProcs() const {
     }
     
     return result;
+}
+
+std::unordered_map<std::string, DMProc*> DMObjectTree::GetAllProcsForObject(DMObject* obj) const {
+    std::unordered_map<std::string, DMProc*> procMap;
+    
+    if (!obj) {
+        return procMap;
+    }
+    
+    // Build hierarchy from current object to root
+    std::vector<DMObject*> hierarchy;
+    DMObject* current = obj;
+    while (current != nullptr) {
+        hierarchy.push_back(current);
+        current = current->Parent;
+    }
+    
+    // Process from root to derived (so derived procs override parent procs)
+    for (auto it = hierarchy.rbegin(); it != hierarchy.rend(); ++it) {
+        DMObject* ancestor = *it;
+        
+        // Add all procs from this object
+        for (const auto& [name, ids] : ancestor->Procs) {
+            if (!ids.empty()) {
+                // Get the most recent definition (last in list)
+                int procId = ids.back();
+                if (procId >= 0 && procId < static_cast<int>(AllProcs.size())) {
+                    procMap[name] = AllProcs[procId].get();
+                }
+            }
+        }
+    }
+    
+    return procMap;
+}
+
+void DMObjectTree::SetDMStandardFinalized() {
+    // Mark all existing objects as being from DMStandard
+    for (const auto& obj : AllObjects) {
+        if (obj) {
+            obj->IsFromDMStandard = true;
+        }
+    }
 }
 
 } // namespace DMCompiler

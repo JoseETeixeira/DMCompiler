@@ -138,8 +138,8 @@ void BytecodeWriter::ResizeStack(int sizeDelta) {
     
     // Detect stack underflow (debugging aid)
     if (CurrentStackSize_ < 0) {
-        std::cerr << "Warning: Stack underflow detected at bytecode position " 
-                  << Bytecode_.size() << " (stack size: " << CurrentStackSize_ << ")" << std::endl;
+        // std::cerr << "Warning: Stack underflow detected at bytecode position " 
+        //           << Bytecode_.size() << " (stack size: " << CurrentStackSize_ << ")" << std::endl;
         // Don't throw - allow compilation to continue for better error reporting
         // Reset to 0 to prevent cascading errors
         CurrentStackSize_ = 0;
@@ -232,11 +232,13 @@ void BytecodeWriter::CreateListEnumerator(int enumeratorId) {
     WriteInt(enumeratorId);
 }
 
-void BytecodeWriter::CreateFilteredListEnumerator(int enumeratorId, int filterTypeId) {
+void BytecodeWriter::CreateFilteredListEnumerator(int enumeratorId, int filterTypeId, const std::string& filterPath) {
     Emit(DreamProcOpcode::CreateFilteredListEnumerator);
     WriteInt(enumeratorId);
     WriteInt(filterTypeId);
-    // TODO: Also need to write DreamPath for the filter type
+    // Write the filter path as a string ID for runtime type checking
+    int pathStringId = GetStringId(filterPath);
+    WriteInt(pathStringId);
 }
 
 void BytecodeWriter::Enumerate(int enumeratorId, const DMReference& reference, int endLabel) {

@@ -151,7 +151,8 @@ public:
     /// </summary>
     /// <param name="enumeratorId">Unique ID for this enumerator</param>
     /// <param name="filterTypeId">Type ID to filter by</param>
-    void CreateFilteredListEnumerator(int enumeratorId, int filterTypeId);
+    /// <param name="filterPath">DreamPath string for the filter type</param>
+    void CreateFilteredListEnumerator(int enumeratorId, int filterTypeId, const std::string& filterPath);
     
     /// <summary>
     /// Enumerate next value from enumerator into a reference.

@@ -74,6 +74,10 @@ public:
     /// -1 indicates no initialization proc
     int InitializationProc = -1;
     
+    /// Whether this object was defined in DMStandard files
+    /// Used to distinguish built-in types from user-defined types
+    bool IsFromDMStandard = false;
+    
     /// Constructor
     /// @param id Unique type identifier
     /// @param path Type path in hierarchy

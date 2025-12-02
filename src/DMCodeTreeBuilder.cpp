@@ -15,6 +15,7 @@ DMCodeTreeBuilder::DMCodeTreeBuilder(DMCompiler* compiler)
     : Compiler_(compiler)
     , ObjectTree_(compiler->GetObjectTree())
     , LeftDMStandard_(false)
+    , DMStandardFinalized_(false)
 {
 }
 
@@ -27,6 +28,7 @@ void DMCodeTreeBuilder::BuildCodeTree(DMASTFile* astFile) {
     }
 
     LeftDMStandard_ = false;
+    DMStandardFinalized_ = false;
 
     if (Compiler_->GetSettings().Verbose) {
         std::cout << "  Building code tree from " << astFile->Statements.size() << " statements..." << std::endl;
@@ -66,7 +68,7 @@ void DMCodeTreeBuilder::ProcessStatement(DMASTStatement* statement, const DreamP
     // Track when we leave DMStandard
     if (!LeftDMStandard_ && !statement->Location_.InDMStandard) {
         LeftDMStandard_ = true;
-        // TODO: Implement DMStandard finalization
+        FinalizeDMStandard();
     }
 
     // Object definition: /mob/player { ... }
@@ -145,6 +147,22 @@ void DMCodeTreeBuilder::ProcessStatement(DMASTStatement* statement, const DreamP
         // This could be a proc-level statement at the wrong level
         // Just skip it - errors should have been reported during parsing
     }
+}
+
+void DMCodeTreeBuilder::FinalizeDMStandard() {
+    if (DMStandardFinalized_) {
+        return;  // Already finalized
+    }
+    
+    DMStandardFinalized_ = true;
+    
+    if (Compiler_->GetSettings().Verbose) {
+        std::cout << "  Finalizing DMStandard (marking " 
+                  << ObjectTree_->AllObjects.size() << " objects as from DMStandard)..." << std::endl;
+    }
+    
+    // Mark all existing objects as being from DMStandard
+    ObjectTree_->SetDMStandardFinalized();
 }
 
 } // namespace DMCompiler

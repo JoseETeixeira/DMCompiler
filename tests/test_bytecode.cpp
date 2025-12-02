@@ -322,11 +322,87 @@ bool TestComplexBytecode() {
     return true;
 }
 
+// Test CreateFilteredListEnumerator emits filter type path
+bool TestFilteredListEnumerator() {
+    std::cout << "  TestFilteredListEnumerator... ";
+    
+    BytecodeWriter writer;
+    
+    // Simulate: for(var/mob/M in world)
+    // This should use CreateFilteredListEnumerator with /mob as filter
+    
+    int enumeratorId = 0;
+    int filterTypeId = 42;  // Simulated type ID for /mob
+    std::string filterPath = "/mob";
+    
+    writer.CreateFilteredListEnumerator(enumeratorId, filterTypeId, filterPath);
+    
+    const auto& bytecode = writer.GetBytecode();
+    
+    // Expected bytecode layout:
+    // [0]: CreateFilteredListEnumerator opcode (0x41)
+    // [1-4]: enumerator ID (4 bytes, little-endian)
+    // [5-8]: filter type ID (4 bytes, little-endian)
+    // [9-12]: filter path string ID (4 bytes, little-endian)
+    
+    assert(bytecode.size() == 13);  // 1 byte opcode + 4 bytes enumerator ID + 4 bytes type ID + 4 bytes string ID
+    
+    // Check opcode
+    assert(bytecode[0] == 0x41);  // CreateFilteredListEnumerator
+    
+    // Check enumerator ID (0)
+    int32_t emittedEnumeratorId = bytecode[1] | (bytecode[2] << 8) | (bytecode[3] << 16) | (static_cast<int32_t>(bytecode[4]) << 24);
+    assert(emittedEnumeratorId == 0);
+    
+    // Check filter type ID (42)
+    int32_t emittedFilterTypeId = bytecode[5] | (bytecode[6] << 8) | (bytecode[7] << 16) | (static_cast<int32_t>(bytecode[8]) << 24);
+    assert(emittedFilterTypeId == 42);
+    
+    // Check that string ID was written (should be 0 since it's the first string)
+    int32_t emittedStringId = bytecode[9] | (bytecode[10] << 8) | (bytecode[11] << 16) | (static_cast<int32_t>(bytecode[12]) << 24);
+    assert(emittedStringId == 0);  // First string in table
+    
+    // Verify the string was added to the string table
+    assert(writer.GetStringId("/mob") == 0);
+    
+    std::cout << "PASSED" << std::endl;
+    return true;
+}
+
+// Test CreateListEnumerator (unfiltered version for comparison)
+bool TestListEnumerator() {
+    std::cout << "  TestListEnumerator... ";
+    
+    BytecodeWriter writer;
+    
+    // Simulate: for(var/M in world) - no type filter
+    int enumeratorId = 5;
+    writer.CreateListEnumerator(enumeratorId);
+    
+    const auto& bytecode = writer.GetBytecode();
+    
+    // Expected bytecode layout:
+    // [0]: CreateListEnumerator opcode (0x40)
+    // [1-4]: enumerator ID (4 bytes, little-endian)
+    
+    assert(bytecode.size() == 5);  // 1 byte opcode + 4 bytes enumerator ID
+    
+    // Check opcode
+    assert(bytecode[0] == 0x40);  // CreateListEnumerator
+    
+    // Check enumerator ID
+    int32_t emittedEnumeratorId = bytecode[1] | (bytecode[2] << 8) | (bytecode[3] << 16) | (static_cast<int32_t>(bytecode[4]) << 24);
+    assert(emittedEnumeratorId == 5);
+    
+    std::cout << "PASSED" << std::endl;
+    return true;
+}
+
 int RunBytecodeTests() {
     std::cout << "\n=== Running Bytecode Tests ===" << std::endl;
     
     int passed = 0;
-    int total = 8;
+    int total = 10;
     
     if (TestBasicOpcodes()) passed++;
     if (TestOpcodesWithOperands()) passed++;
@@ -336,6 +412,8 @@ int RunBytecodeTests() {
     if (TestReset()) passed++;
     if (TestMultipleLabels()) passed++;
     if (TestComplexBytecode()) passed++;
+    if (TestFilteredListEnumerator()) passed++;
+    if (TestListEnumerator()) passed++;
     
     std::cout << "\n=== Bytecode Test Results ===" << std::endl;
     std::cout << "Passed: " << passed << "/" << total << std::endl;

@@ -300,6 +300,24 @@ Token DMLexer::ParseOperator() {
     char current = GetCurrent();
     char next = Peek();
     
+    // Three-character operators
+    if (current == '|' && next == '|' && Peek(2) == '=') {
+        Advance(); Advance(); Advance();
+        return Token(TokenType::OrOrAssign, "||=", startLoc);
+    }
+    if (current == '&' && next == '&' && Peek(2) == '=') {
+        Advance(); Advance(); Advance();
+        return Token(TokenType::AndAndAssign, "&&=", startLoc);
+    }
+    if (current == '%' && next == '%' && Peek(2) == '=') {
+        Advance(); Advance(); Advance();
+        return Token(TokenType::ModuloModuloAssign, "%%=", startLoc);
+    }
+    if (current == '.' && next == '.' && Peek(2) == '.') {
+        Advance(); Advance(); Advance();
+        return Token(TokenType::DotDotDot, "...", startLoc);
+    }
+    
     // Two-character operators
     if (current == '=' && next == '=') {
         Advance(); Advance();
@@ -357,17 +375,55 @@ Token DMLexer::ParseOperator() {
         Advance(); Advance();
         return Token(TokenType::DivideAssign, "/=", startLoc);
     }
+    if (current == '%' && next == '=') {
+        Advance(); Advance();
+        return Token(TokenType::ModuloAssign, "%=", startLoc);
+    }
+    if (current == '&' && next == '=') {
+        Advance(); Advance();
+        return Token(TokenType::AndAssign, "&=", startLoc);
+    }
+    if (current == '|' && next == '=') {
+        Advance(); Advance();
+        return Token(TokenType::OrAssign, "|=", startLoc);
+    }
+    if (current == '^' && next == '=') {
+        Advance(); Advance();
+        return Token(TokenType::XorAssign, "^=", startLoc);
+    }
     if (current == '.' && next == '.') {
         Advance(); Advance();
-        if (!AtEndOfSource_ && GetCurrent() == '.') {
-            Advance();
-            return Token(TokenType::DotDotDot, "...", startLoc);
-        }
         return Token(TokenType::DotDot, "..", startLoc);
     }
     if (current == ':' && next == ':') {
         Advance(); Advance();
         return Token(TokenType::DoubleColon, "::", startLoc);
+    }
+    if (current == ':' && next == '=') {
+        Advance(); Advance();
+        return Token(TokenType::AssignInto, ":=", startLoc);
+    }
+    // Tilde comparison operators
+    if (current == '~' && next == '=') {
+        Advance(); Advance();
+        return Token(TokenType::TildeEquals, "~=", startLoc);
+    }
+    if (current == '~' && next == '!') {
+        Advance(); Advance();
+        return Token(TokenType::TildeExclamation, "~!", startLoc);
+    }
+    // Null-conditional operators (question prefix)
+    if (current == '?' && next == '.') {
+        Advance(); Advance();
+        return Token(TokenType::QuestionDot, "?.", startLoc);
+    }
+    if (current == '?' && next == ':') {
+        Advance(); Advance();
+        return Token(TokenType::QuestionColon, "?:", startLoc);
+    }
+    if (current == '?' && next == '[') {
+        Advance(); Advance();
+        return Token(TokenType::QuestionBracket, "?[", startLoc);
     }
     
     // Single-character operators

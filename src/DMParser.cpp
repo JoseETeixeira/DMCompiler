@@ -12,24 +12,24 @@ const std::array<TokenType, 15> DMParser::AssignTypes_ = {
     TokenType::PlusAssign,
     TokenType::MinusAssign,
     TokenType::OrAssign,
-    TokenType::OrAssign,  // BarBarEquals - TODO: check if separate token needed
+    TokenType::OrOrAssign,         // ||= (logical or assign)
     TokenType::AndAssign,
-    TokenType::AndAssign,  // AndAndEquals - TODO: check if separate token needed
+    TokenType::AndAndAssign,       // &&= (logical and assign)
     TokenType::MultiplyAssign,
     TokenType::DivideAssign,
     TokenType::LeftShiftAssign,
     TokenType::RightShiftAssign,
     TokenType::XorAssign,
     TokenType::ModuloAssign,
-    TokenType::ModuloAssign,  // ModulusModulusEquals - TODO: check if separate token needed
-    TokenType::Assign  // AssignInto - TODO: check if separate token needed
+    TokenType::ModuloModuloAssign, // %%= (modulo-modulo assign)
+    TokenType::AssignInto          // := (assign into)
 };
 
 const std::array<TokenType, 4> DMParser::ComparisonTypes_ = {
     TokenType::Equals,
     TokenType::NotEquals,
-    TokenType::Equals,  // TildeEquals - TODO: check if separate token needed
-    TokenType::NotEquals  // TildeExclamation - TODO: check if separate token needed
+    TokenType::TildeEquals,        // ~= (equivalence comparison)
+    TokenType::TildeExclamation    // ~! (non-equivalence comparison)
 };
 
 const std::array<TokenType, 4> DMParser::LtGtComparisonTypes_ = {
@@ -60,9 +60,9 @@ const std::array<TokenType, 6> DMParser::DereferenceTypes_ = {
     TokenType::Dot,
     TokenType::Colon,
     TokenType::DoubleColon,
-    TokenType::Dot,  // QuestionPeriod - TODO: check if separate token needed
-    TokenType::Colon,  // QuestionColon - TODO: check if separate token needed
-    TokenType::LeftBracket  // QuestionLeftBracket - TODO: check if separate token needed
+    TokenType::QuestionDot,        // ?. (null-conditional member access)
+    TokenType::QuestionColon,      // ?: (null-coalescing)
+    TokenType::QuestionBracket     // ?[ (null-conditional index)
 };
 
 const std::array<TokenType, 1> DMParser::WhitespaceTypes_ = {
@@ -280,9 +280,50 @@ std::unique_ptr<DMASTFile> DMParser::ParseFile() {
 std::vector<std::unique_ptr<DMASTStatement>> DMParser::BlockInner() {
     std::vector<std::unique_ptr<DMASTStatement>> statements;
     
-    // TODO: Implement statement parsing
-    // For now, just return empty to get build working
     Whitespace();
+    
+    // Parse statements until we hit a closing brace, dedent, or EOF
+    while (Current().Type != TokenType::RightCurlyBracket && 
+           Current().Type != TokenType::Dedent &&
+           Current().Type != TokenType::EndOfFile) {
+        
+        // Skip empty lines
+        while (Current().Type == TokenType::Newline || Current().Type == TokenType::Semicolon) {
+            Advance();
+        }
+        
+        if (Current().Type == TokenType::RightCurlyBracket || 
+            Current().Type == TokenType::Dedent ||
+            Current().Type == TokenType::EndOfFile) {
+            break;
+        }
+        
+        Location stmtLoc = CurrentLocation();
+        try {
+            auto stmt = Statement();
+            if (stmt) {
+                statements.push_back(std::move(stmt));
+            } else {
+                // If Statement() returns null, skip to next line to avoid infinite loop
+                while (Current().Type != TokenType::Newline && 
+                       Current().Type != TokenType::Semicolon &&
+                       Current().Type != TokenType::RightCurlyBracket &&
+                       Current().Type != TokenType::EndOfFile) {
+                    Advance();
+                }
+            }
+        } catch (const std::exception& e) {
+            // Recover from parse error and continue
+            RecoverFromError(std::string("Parse error in block: ") + e.what(), stmtLoc);
+        }
+        
+        // Skip statement terminators
+        while (Current().Type == TokenType::Semicolon || Current().Type == TokenType::Newline) {
+            Advance();
+        }
+        
+        Whitespace();
+    }
     
     return statements;
 }
@@ -292,9 +333,22 @@ std::unique_ptr<DMASTProcBlockInner> DMParser::ProcBlock() {
     std::vector<std::unique_ptr<DMASTProcStatement>> statements;
     std::vector<std::unique_ptr<DMASTProcStatement>> setStatements;
     
-    // TODO: Implement proc block parsing
-    // This will parse proc/verb body statements
-    // Need to handle Set statements separately for hoisting
+    // ProcBlock parses a proc body and separates set statements for hoisting
+    // Set statements in DM are hoisted to the beginning of the proc
+    
+    // Parse the block using ProcBlockInner
+    auto block = ProcBlockInner();
+    
+    if (block) {
+        // Separate set statements from other statements
+        for (auto& stmt : block->Statements) {
+            if (dynamic_cast<DMASTProcStatementSet*>(stmt.get())) {
+                setStatements.push_back(std::move(stmt));
+            } else {
+                statements.push_back(std::move(stmt));
+            }
+        }
+    }
     
     return std::make_unique<DMASTProcBlockInner>(
         loc,
@@ -343,6 +397,12 @@ std::unique_ptr<DMASTExpression> DMParser::PrimaryExpression() {
     if (token.Type == TokenType::String) {
         Advance();
         return std::make_unique<DMASTConstantString>(loc, token.Value.StringValue);
+    }
+
+    // Resource literal
+    if (token.Type == TokenType::Resource) {
+        Advance();
+        return std::make_unique<DMASTConstantResource>(loc, token.Value.StringValue);
     }
     
     // Null literal
@@ -634,10 +694,24 @@ std::unique_ptr<DMASTExpression> DMParser::PostfixExpression() {
             
             if (Current().Type != TokenType::RightParenthesis) {
                 do {
-                    // For now, treat each argument as a simple expression
-                    // TODO: Handle named parameters (name = value)
-                    auto argExpr = Expression();
-                    parameters.push_back(std::make_unique<DMASTCallParameter>(argExpr->Location_, std::move(argExpr)));
+                    // Parse argument - handle named parameters (name = value)
+                    // We parse up to ternary level to avoid treating = as assignment
+                    auto argExpr = TernaryExpression();
+                    
+                    // Check for named parameter syntax: name = value
+                    if (Current().Type == TokenType::Assign) {
+                        // This is a named parameter: name = value
+                        // The argExpr should be an identifier (the parameter name)
+                        Location paramLoc = CurrentLocation();
+                        Advance(); // consume '='
+                        auto valueExpr = TernaryExpression();
+                        
+                        // Create a named parameter: key is the name, value is the expression
+                        parameters.push_back(std::make_unique<DMASTCallParameter>(paramLoc, std::move(valueExpr), std::move(argExpr)));
+                    } else {
+                        // Simple positional argument
+                        parameters.push_back(std::make_unique<DMASTCallParameter>(argExpr->Location_, std::move(argExpr)));
+                    }
                     
                     if (Current().Type == TokenType::Comma) {
                         Advance();
@@ -774,17 +848,14 @@ std::unique_ptr<DMASTExpression> DMParser::NewExpression() {
     Location loc = CurrentLocation();
     Consume(TokenType::New, "Expected 'new'");
     
-    // Parse the type path
-    auto pathExpr = PathExpression();
-    auto* pathConstant = dynamic_cast<DMASTConstantPath*>(pathExpr.get());
+    // Parse the type expression
+    // We use PrimaryExpression to handle paths, identifiers, parenthesized exprs
+    auto typeExpr = PrimaryExpression();
     
-    if (!pathConstant) {
-        Emit(WarningCode::BadToken, "Expected path after 'new'");
+    if (!typeExpr) {
+        Emit(WarningCode::BadToken, "Expected type expression after 'new'");
         return std::make_unique<DMASTConstantNull>(loc);
     }
-    
-    // Take ownership of the path
-    auto path = std::make_unique<DMASTConstantPath>(pathConstant->Location_, pathConstant->Path);
     
     // Check for optional constructor call parameters
     std::vector<std::unique_ptr<DMASTCallParameter>> parameters;
@@ -793,8 +864,18 @@ std::unique_ptr<DMASTExpression> DMParser::NewExpression() {
         
         if (Current().Type != TokenType::RightParenthesis) {
             do {
-                auto argExpr = Expression();
-                parameters.push_back(std::make_unique<DMASTCallParameter>(argExpr->Location_, std::move(argExpr)));
+                // Parse argument - handle named parameters (name = value)
+                auto argExpr = TernaryExpression();
+                
+                // Check for named parameter syntax: name = value
+                if (Current().Type == TokenType::Assign) {
+                    Location paramLoc = CurrentLocation();
+                    Advance(); // consume '='
+                    auto valueExpr = TernaryExpression();
+                    parameters.push_back(std::make_unique<DMASTCallParameter>(paramLoc, std::move(valueExpr), std::move(argExpr)));
+                } else {
+                    parameters.push_back(std::make_unique<DMASTCallParameter>(argExpr->Location_, std::move(argExpr)));
+                }
                 
                 if (Current().Type == TokenType::Comma) {
                     Advance();
@@ -807,7 +888,7 @@ std::unique_ptr<DMASTExpression> DMParser::NewExpression() {
         Consume(TokenType::RightParenthesis, "Expected ')' after new arguments");
     }
     
-    return std::make_unique<DMASTNewPath>(loc, std::move(path), std::move(parameters));
+    return std::make_unique<DMASTNewPath>(loc, std::move(typeExpr), std::move(parameters));
 }
 
 // Parse list expressions: list(1, 2, 3) or list("key" = value, ...)
@@ -859,8 +940,18 @@ std::unique_ptr<DMASTExpression> DMParser::NewListExpression(const Location& loc
     
     if (Current().Type != TokenType::RightParenthesis) {
         do {
-            auto paramExpr = Expression();
-            parameters.push_back(std::make_unique<DMASTCallParameter>(paramExpr->Location_, std::move(paramExpr)));
+            // Parse argument - handle named parameters (name = value)
+            auto argExpr = TernaryExpression();
+            
+            // Check for named parameter syntax: name = value
+            if (Current().Type == TokenType::Assign) {
+                Location paramLoc = CurrentLocation();
+                Advance(); // consume '='
+                auto valueExpr = TernaryExpression();
+                parameters.push_back(std::make_unique<DMASTCallParameter>(paramLoc, std::move(valueExpr), std::move(argExpr)));
+            } else {
+                parameters.push_back(std::make_unique<DMASTCallParameter>(argExpr->Location_, std::move(argExpr)));
+            }
             
             if (Current().Type == TokenType::Comma) {
                 Advance();
@@ -952,6 +1043,10 @@ BinaryOperator DMParser::TokenTypeToBinaryOp(TokenType type) {
         case TokenType::LessOrEqual: return BinaryOperator::LessOrEqual;
         case TokenType::GreaterOrEqual: return BinaryOperator::GreaterOrEqual;
         
+        // Equivalence operators (DM-specific)
+        case TokenType::TildeEquals: return BinaryOperator::Equivalent;
+        case TokenType::TildeExclamation: return BinaryOperator::NotEquivalent;
+        
         // Bitwise operators
         case TokenType::BitwiseAnd: return BinaryOperator::BitwiseAnd;
         case TokenType::BitwiseXor: return BinaryOperator::BitwiseXor;
@@ -987,6 +1082,10 @@ AssignmentOperator DMParser::TokenTypeToAssignmentOp(TokenType type) {
         case TokenType::XorAssign: return AssignmentOperator::BitwiseXorAssign;
         case TokenType::LeftShiftAssign: return AssignmentOperator::LeftShiftAssign;
         case TokenType::RightShiftAssign: return AssignmentOperator::RightShiftAssign;
+        case TokenType::OrOrAssign: return AssignmentOperator::LogicalOrAssign;
+        case TokenType::AndAndAssign: return AssignmentOperator::LogicalAndAssign;
+        case TokenType::ModuloModuloAssign: return AssignmentOperator::ModuloModuloAssign;
+        case TokenType::AssignInto: return AssignmentOperator::AssignInto;
         default:
             return AssignmentOperator::Assign; // Should never reach here
     }
@@ -2111,17 +2210,35 @@ std::unique_ptr<DMASTStatement> DMParser::Statement() {
     
     // Check for proc/verb keyword FIRST (before paths)
     if (Current().Type == TokenType::Proc) {
-        return ObjectProcDefinition(false);
+        Token saved = Current();
+        Advance();
+        Whitespace();
+        if (Current().Type == TokenType::Newline || Current().Type == TokenType::LeftCurlyBracket) {
+            ReuseToken(saved);
+        } else {
+            ReuseToken(saved);
+            return ObjectProcDefinition(false);
+        }
     }
     if (Current().Type == TokenType::Verb) {
-        return ObjectProcDefinition(true);
+        Token saved = Current();
+        Advance();
+        Whitespace();
+        if (Current().Type == TokenType::Newline || Current().Type == TokenType::LeftCurlyBracket) {
+            ReuseToken(saved);
+        } else {
+            ReuseToken(saved);
+            return ObjectProcDefinition(true);
+        }
     }
     
     // Try to parse a path (could be /obj, /obj/item, New, test, var, etc.)
     // Note: "var" is now handled as a path element, not a special keyword here
     if (Current().Type == TokenType::Divide || 
         IsInSet(Current().Type, IdentifierTypes_) ||
-        Current().Type == TokenType::Var) {
+        Current().Type == TokenType::Var ||
+        Current().Type == TokenType::Proc ||
+        Current().Type == TokenType::Verb) {
         // Save position in case we need to backtrack
         auto path = ParsePath();
         

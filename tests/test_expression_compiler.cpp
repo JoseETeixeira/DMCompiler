@@ -2967,6 +2967,371 @@ bool TestCompileInput() {
     return true;
 }
 
+// ============================================================================
+// Named Arguments Tests (Task 9)
+// ============================================================================
+
+// Test: Named arguments only - foo(a = 5)
+// Should emit FromStackKeyed (2) with proper stack layout
+bool TestCompileNamedArgumentsOnly() {
+    std::cout << "  TestCompileNamedArgumentsOnly... ";
+    
+    DMCompiler::BytecodeWriter writer;
+    DMCompiler::DMCompiler compiler;
+    DMCompiler::DMObject testObj(0, DMCompiler::DreamPath("/test"));
+    DMCompiler::DMProc proc(0, "test_proc", &testObj, false, DMCompiler::Location());
+    DMCompiler::DMExpressionCompiler exprCompiler(&compiler, &proc, &writer);
+    
+    // Create AST: src.foo(a = 5)
+    auto srcIdent = std::make_unique<DMCompiler::DMASTIdentifier>(DMCompiler::Location(), "src");
+    auto methodIdent = std::make_unique<DMCompiler::DMASTIdentifier>(DMCompiler::Location(), "foo");
+    auto deref = std::make_unique<DMCompiler::DMASTDereference>(
+        DMCompiler::Location(),
+        std::move(srcIdent),
+        DMCompiler::DereferenceType::Direct,
+        std::move(methodIdent)
+    );
+    
+    // Create parameter: a = 5 (named argument)
+    std::vector<std::unique_ptr<DMCompiler::DMASTCallParameter>> params;
+    auto keyExpr = std::make_unique<DMCompiler::DMASTConstantString>(DMCompiler::Location(), "a");
+    auto valueExpr = std::make_unique<DMCompiler::DMASTConstantInteger>(DMCompiler::Location(), 5);
+    params.push_back(std::make_unique<DMCompiler::DMASTCallParameter>(
+        DMCompiler::Location(),
+        std::move(valueExpr),
+        std::move(keyExpr)
+    ));
+    
+    auto callExpr = std::make_unique<DMCompiler::DMASTCall>(
+        DMCompiler::Location(),
+        std::move(deref),
+        std::move(params)
+    );
+    
+    bool success = exprCompiler.CompileExpression(callExpr.get());
+    assert(success && "Should successfully compile named argument call");
+    
+    const auto& bytecode = writer.GetBytecode();
+    
+    // Find DereferenceCall opcode and check arguments
+    // Expected bytecode:
+    // 1. PushReferenceValue Src (2 bytes)
+    // 2. PushString "a" (5 bytes) - key
+    // 3. PushFloat 5.0 (5 bytes) - value
+    // 4. DereferenceCall (1 byte)
+    // 5. String ID for "foo" (4 bytes)
+    // 6. Arguments type byte (1 byte: 2 = FromStackKeyed)
+    // 7. Argument count int (4 bytes: 2 = 1 key + 1 value = 2 total)
+    
+    bool foundCall = false;
+    for (size_t i = 0; i < bytecode.size(); i++) {
+        if (bytecode[i] == static_cast<uint8_t>(DMCompiler::DreamProcOpcode::DereferenceCall)) {
+            foundCall = true;
+            // Check arguments type is FromStackKeyed (2)
+            size_t argsTypeOffset = i + 1 + 4; // after opcode + string ID
+            assert(argsTypeOffset < bytecode.size() && "Bytecode too short for args type");
+            assert(bytecode[argsTypeOffset] == 2 && "Arguments type should be FromStackKeyed (2)");
+            
+            // Check argument count is 2 (1 named arg = 2 values: key + value)
+            size_t argCountOffset = argsTypeOffset + 1;
+            assert(argCountOffset + 4 <= bytecode.size() && "Bytecode too short for arg count");
+            int32_t argCount = *reinterpret_cast<const int32_t*>(&bytecode[argCountOffset]);
+            assert(argCount == 2 && "Argument count should be 2 for 1 named arg");
+            break;
+        }
+    }
+    assert(foundCall && "Should emit DereferenceCall opcode");
+    
+    std::cout << "PASSED" << std::endl;
+    return true;
+}
+
+// Test: Mixed positional and named arguments - foo(1, b = 2)
+// Should emit FromStackKeyed (2) with positional first, then keyed
+bool TestCompileMixedArguments() {
+    std::cout << "  TestCompileMixedArguments... ";
+    
+    DMCompiler::BytecodeWriter writer;
+    DMCompiler::DMCompiler compiler;
+    DMCompiler::DMObject testObj(0, DMCompiler::DreamPath("/test"));
+    DMCompiler::DMProc proc(0, "test_proc", &testObj, false, DMCompiler::Location());
+    DMCompiler::DMExpressionCompiler exprCompiler(&compiler, &proc, &writer);
+    
+    // Create AST: src.foo(1, b = 2)
+    auto srcIdent = std::make_unique<DMCompiler::DMASTIdentifier>(DMCompiler::Location(), "src");
+    auto methodIdent = std::make_unique<DMCompiler::DMASTIdentifier>(DMCompiler::Location(), "foo");
+    auto deref = std::make_unique<DMCompiler::DMASTDereference>(
+        DMCompiler::Location(),
+        std::move(srcIdent),
+        DMCompiler::DereferenceType::Direct,
+        std::move(methodIdent)
+    );
+    
+    // Create parameters
+    std::vector<std::unique_ptr<DMCompiler::DMASTCallParameter>> params;
+    
+    // First: positional arg 1
+    auto arg1 = std::make_unique<DMCompiler::DMASTConstantInteger>(DMCompiler::Location(), 1);
+    params.push_back(std::make_unique<DMCompiler::DMASTCallParameter>(
+        DMCompiler::Location(),
+        std::move(arg1),
+        nullptr  // No key (positional)
+    ));
+    
+    // Second: named arg b = 2
+    auto keyExpr = std::make_unique<DMCompiler::DMASTConstantString>(DMCompiler::Location(), "b");
+    auto valueExpr = std::make_unique<DMCompiler::DMASTConstantInteger>(DMCompiler::Location(), 2);
+    params.push_back(std::make_unique<DMCompiler::DMASTCallParameter>(
+        DMCompiler::Location(),
+        std::move(valueExpr),
+        std::move(keyExpr)
+    ));
+    
+    auto callExpr = std::make_unique<DMCompiler::DMASTCall>(
+        DMCompiler::Location(),
+        std::move(deref),
+        std::move(params)
+    );
+    
+    bool success = exprCompiler.CompileExpression(callExpr.get());
+    assert(success && "Should successfully compile mixed argument call");
+    
+    const auto& bytecode = writer.GetBytecode();
+    
+    // Expected bytecode:
+    // 1. PushReferenceValue Src (2 bytes)
+    // 2. PushFloat 1.0 (5 bytes) - positional arg
+    // 3. PushString "b" (5 bytes) - key
+    // 4. PushFloat 2.0 (5 bytes) - value
+    // 5. DereferenceCall (1 byte)
+    // 6. String ID for "foo" (4 bytes)
+    // 7. Arguments type byte (1 byte: 2 = FromStackKeyed)
+    // 8. Argument count int (4 bytes: 3 = 1 positional + 2 for named)
+    
+    bool foundCall = false;
+    for (size_t i = 0; i < bytecode.size(); i++) {
+        if (bytecode[i] == static_cast<uint8_t>(DMCompiler::DreamProcOpcode::DereferenceCall)) {
+            foundCall = true;
+            size_t argsTypeOffset = i + 1 + 4;
+            assert(argsTypeOffset < bytecode.size() && "Bytecode too short for args type");
+            assert(bytecode[argsTypeOffset] == 2 && "Arguments type should be FromStackKeyed (2)");
+            
+            // Check argument count is 3 (1 positional + 1 named = 1 + 2 = 3)
+            size_t argCountOffset = argsTypeOffset + 1;
+            assert(argCountOffset + 4 <= bytecode.size() && "Bytecode too short for arg count");
+            int32_t argCount = *reinterpret_cast<const int32_t*>(&bytecode[argCountOffset]);
+            assert(argCount == 3 && "Argument count should be 3 for 1 positional + 1 named");
+            break;
+        }
+    }
+    assert(foundCall && "Should emit DereferenceCall opcode");
+    
+    std::cout << "PASSED" << std::endl;
+    return true;
+}
+
+// Test: Positional arguments only - verify FromStack (1) type unchanged
+bool TestCompilePositionalArgumentsVerifyType() {
+    std::cout << "  TestCompilePositionalArgumentsVerifyType... ";
+    
+    DMCompiler::BytecodeWriter writer;
+    DMCompiler::DMCompiler compiler;
+    DMCompiler::DMObject testObj(0, DMCompiler::DreamPath("/test"));
+    DMCompiler::DMProc proc(0, "test_proc", &testObj, false, DMCompiler::Location());
+    DMCompiler::DMExpressionCompiler exprCompiler(&compiler, &proc, &writer);
+    
+    // Create AST: src.foo(1, 2)
+    auto srcIdent = std::make_unique<DMCompiler::DMASTIdentifier>(DMCompiler::Location(), "src");
+    auto methodIdent = std::make_unique<DMCompiler::DMASTIdentifier>(DMCompiler::Location(), "foo");
+    auto deref = std::make_unique<DMCompiler::DMASTDereference>(
+        DMCompiler::Location(),
+        std::move(srcIdent),
+        DMCompiler::DereferenceType::Direct,
+        std::move(methodIdent)
+    );
+    
+    // Create positional parameters only
+    std::vector<std::unique_ptr<DMCompiler::DMASTCallParameter>> params;
+    
+    auto arg1 = std::make_unique<DMCompiler::DMASTConstantInteger>(DMCompiler::Location(), 1);
+    params.push_back(std::make_unique<DMCompiler::DMASTCallParameter>(
+        DMCompiler::Location(),
+        std::move(arg1),
+        nullptr
+    ));
+    
+    auto arg2 = std::make_unique<DMCompiler::DMASTConstantInteger>(DMCompiler::Location(), 2);
+    params.push_back(std::make_unique<DMCompiler::DMASTCallParameter>(
+        DMCompiler::Location(),
+        std::move(arg2),
+        nullptr
+    ));
+    
+    auto callExpr = std::make_unique<DMCompiler::DMASTCall>(
+        DMCompiler::Location(),
+        std::move(deref),
+        std::move(params)
+    );
+    
+    bool success = exprCompiler.CompileExpression(callExpr.get());
+    assert(success && "Should successfully compile positional-only call");
+    
+    const auto& bytecode = writer.GetBytecode();
+    
+    bool foundCall = false;
+    for (size_t i = 0; i < bytecode.size(); i++) {
+        if (bytecode[i] == static_cast<uint8_t>(DMCompiler::DreamProcOpcode::DereferenceCall)) {
+            foundCall = true;
+            size_t argsTypeOffset = i + 1 + 4;
+            assert(argsTypeOffset < bytecode.size() && "Bytecode too short for args type");
+            // Arguments type should be FromStack (1) for positional only
+            assert(bytecode[argsTypeOffset] == 1 && "Arguments type should be FromStack (1) for positional only");
+            
+            size_t argCountOffset = argsTypeOffset + 1;
+            assert(argCountOffset + 4 <= bytecode.size() && "Bytecode too short for arg count");
+            int32_t argCount = *reinterpret_cast<const int32_t*>(&bytecode[argCountOffset]);
+            assert(argCount == 2 && "Argument count should be 2");
+            break;
+        }
+    }
+    assert(foundCall && "Should emit DereferenceCall opcode");
+    
+    std::cout << "PASSED" << std::endl;
+    return true;
+}
+
+// Test: Empty call - verify None (0) type unchanged
+bool TestCompileEmptyCallVerifyType() {
+    std::cout << "  TestCompileEmptyCallVerifyType... ";
+    
+    DMCompiler::BytecodeWriter writer;
+    DMCompiler::DMCompiler compiler;
+    DMCompiler::DMObject testObj(0, DMCompiler::DreamPath("/test"));
+    DMCompiler::DMProc proc(0, "test_proc", &testObj, false, DMCompiler::Location());
+    DMCompiler::DMExpressionCompiler exprCompiler(&compiler, &proc, &writer);
+    
+    // Create AST: src.foo()
+    auto srcIdent = std::make_unique<DMCompiler::DMASTIdentifier>(DMCompiler::Location(), "src");
+    auto methodIdent = std::make_unique<DMCompiler::DMASTIdentifier>(DMCompiler::Location(), "foo");
+    auto deref = std::make_unique<DMCompiler::DMASTDereference>(
+        DMCompiler::Location(),
+        std::move(srcIdent),
+        DMCompiler::DereferenceType::Direct,
+        std::move(methodIdent)
+    );
+    
+    // Empty parameters
+    std::vector<std::unique_ptr<DMCompiler::DMASTCallParameter>> params;
+    
+    auto callExpr = std::make_unique<DMCompiler::DMASTCall>(
+        DMCompiler::Location(),
+        std::move(deref),
+        std::move(params)
+    );
+    
+    bool success = exprCompiler.CompileExpression(callExpr.get());
+    assert(success && "Should successfully compile empty call");
+    
+    const auto& bytecode = writer.GetBytecode();
+    
+    bool foundCall = false;
+    for (size_t i = 0; i < bytecode.size(); i++) {
+        if (bytecode[i] == static_cast<uint8_t>(DMCompiler::DreamProcOpcode::DereferenceCall)) {
+            foundCall = true;
+            size_t argsTypeOffset = i + 1 + 4;
+            assert(argsTypeOffset < bytecode.size() && "Bytecode too short for args type");
+            // Arguments type should be None (0) for empty call
+            assert(bytecode[argsTypeOffset] == 0 && "Arguments type should be None (0) for empty call");
+            
+            size_t argCountOffset = argsTypeOffset + 1;
+            assert(argCountOffset + 4 <= bytecode.size() && "Bytecode too short for arg count");
+            int32_t argCount = *reinterpret_cast<const int32_t*>(&bytecode[argCountOffset]);
+            assert(argCount == 0 && "Argument count should be 0");
+            break;
+        }
+    }
+    assert(foundCall && "Should emit DereferenceCall opcode");
+    
+    std::cout << "PASSED" << std::endl;
+    return true;
+}
+
+// Test: Multiple named arguments - foo(a = 1, b = 2, c = 3)
+bool TestCompileMultipleNamedArguments() {
+    std::cout << "  TestCompileMultipleNamedArguments... ";
+    
+    DMCompiler::BytecodeWriter writer;
+    DMCompiler::DMCompiler compiler;
+    DMCompiler::DMObject testObj(0, DMCompiler::DreamPath("/test"));
+    DMCompiler::DMProc proc(0, "test_proc", &testObj, false, DMCompiler::Location());
+    DMCompiler::DMExpressionCompiler exprCompiler(&compiler, &proc, &writer);
+    
+    // Create AST: src.foo(a = 1, b = 2, c = 3)
+    auto srcIdent = std::make_unique<DMCompiler::DMASTIdentifier>(DMCompiler::Location(), "src");
+    auto methodIdent = std::make_unique<DMCompiler::DMASTIdentifier>(DMCompiler::Location(), "foo");
+    auto deref = std::make_unique<DMCompiler::DMASTDereference>(
+        DMCompiler::Location(),
+        std::move(srcIdent),
+        DMCompiler::DereferenceType::Direct,
+        std::move(methodIdent)
+    );
+    
+    std::vector<std::unique_ptr<DMCompiler::DMASTCallParameter>> params;
+    
+    // a = 1
+    params.push_back(std::make_unique<DMCompiler::DMASTCallParameter>(
+        DMCompiler::Location(),
+        std::make_unique<DMCompiler::DMASTConstantInteger>(DMCompiler::Location(), 1),
+        std::make_unique<DMCompiler::DMASTConstantString>(DMCompiler::Location(), "a")
+    ));
+    
+    // b = 2
+    params.push_back(std::make_unique<DMCompiler::DMASTCallParameter>(
+        DMCompiler::Location(),
+        std::make_unique<DMCompiler::DMASTConstantInteger>(DMCompiler::Location(), 2),
+        std::make_unique<DMCompiler::DMASTConstantString>(DMCompiler::Location(), "b")
+    ));
+    
+    // c = 3
+    params.push_back(std::make_unique<DMCompiler::DMASTCallParameter>(
+        DMCompiler::Location(),
+        std::make_unique<DMCompiler::DMASTConstantInteger>(DMCompiler::Location(), 3),
+        std::make_unique<DMCompiler::DMASTConstantString>(DMCompiler::Location(), "c")
+    ));
+    
+    auto callExpr = std::make_unique<DMCompiler::DMASTCall>(
+        DMCompiler::Location(),
+        std::move(deref),
+        std::move(params)
+    );
+    
+    bool success = exprCompiler.CompileExpression(callExpr.get());
+    assert(success && "Should successfully compile multiple named arguments");
+    
+    const auto& bytecode = writer.GetBytecode();
+    
+    bool foundCall = false;
+    for (size_t i = 0; i < bytecode.size(); i++) {
+        if (bytecode[i] == static_cast<uint8_t>(DMCompiler::DreamProcOpcode::DereferenceCall)) {
+            foundCall = true;
+            size_t argsTypeOffset = i + 1 + 4;
+            assert(argsTypeOffset < bytecode.size() && "Bytecode too short for args type");
+            assert(bytecode[argsTypeOffset] == 2 && "Arguments type should be FromStackKeyed (2)");
+            
+            // 3 named args = 6 total values (3 keys + 3 values)
+            size_t argCountOffset = argsTypeOffset + 1;
+            assert(argCountOffset + 4 <= bytecode.size() && "Bytecode too short for arg count");
+            int32_t argCount = *reinterpret_cast<const int32_t*>(&bytecode[argCountOffset]);
+            assert(argCount == 6 && "Argument count should be 6 for 3 named args");
+            break;
+        }
+    }
+    assert(foundCall && "Should emit DereferenceCall opcode");
+    
+    std::cout << "PASSED" << std::endl;
+    return true;
+}
+
 int RunExpressionCompilerTests() {
     std::cout << "\n=== Running Expression Compiler Tests ===" << std::endl;
     
@@ -3031,6 +3396,12 @@ int RunExpressionCompilerTests() {
         if (!TestCompileRgb()) failures++;
         if (!TestCompileProb()) failures++;
         if (!TestCompileInput()) failures++;
+        // Named Arguments Tests (Task 9)
+        if (!TestCompileNamedArgumentsOnly()) failures++;
+        if (!TestCompileMixedArguments()) failures++;
+        if (!TestCompilePositionalArgumentsVerifyType()) failures++;
+        if (!TestCompileEmptyCallVerifyType()) failures++;
+        if (!TestCompileMultipleNamedArguments()) failures++;
     } catch (const std::exception& e) {
         std::cerr << "Exception during expression compiler tests: " << e.what() << std::endl;
         failures++;

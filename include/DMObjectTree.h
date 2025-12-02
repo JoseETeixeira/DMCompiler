@@ -147,11 +147,12 @@ public:
     
     /// Upward search for types and procs in the hierarchy
     /// Walks up the parent chain looking for a matching type path
-    /// TODO: Implement full proc resolution when needed
+    /// Also supports proc resolution when procName is provided
     /// @param path Starting point for the search
     /// @param search The path to search for
+    /// @param procName Optional proc name to search for (for proc resolution)
     /// @return The found path, or empty optional if not found
-    std::optional<DreamPath> UpwardSearch(const DreamPath& path, const DreamPath& search);
+    std::optional<DreamPath> UpwardSearch(const DreamPath& path, const DreamPath& search, const std::string& procName = "");
     
     /// Register a global proc by name and ID
     /// Used during compilation to track globally-accessible procedures
@@ -215,6 +216,18 @@ public:
     /// Get all procs in the tree (for iteration during compilation)
     /// @return Vector of pointers to all DMProc instances
     std::vector<DMProc*> GetAllProcs() const;
+    
+    /// Get all procs for an object including inherited procs
+    /// Walks up the inheritance hierarchy and collects all procs
+    /// Child procs override parent procs with the same name
+    /// @param obj The object to get procs for
+    /// @return Map of proc name to the most-derived DMProc
+    std::unordered_map<std::string, DMProc*> GetAllProcsForObject(DMObject* obj) const;
+    
+    /// Mark all existing objects and procs as being from DMStandard
+    /// Called when transitioning from DMStandard file processing to user code
+    /// Sets IsFromDMStandard=true on all objects created before this point
+    void SetDMStandardFinalized();
 
 private:
     /// Pointer to compiler for error reporting (may be null)

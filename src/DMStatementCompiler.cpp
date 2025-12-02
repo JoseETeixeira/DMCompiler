@@ -523,8 +523,8 @@ bool DMStatementCompiler::CompileContinue(DMASTProcStatementContinue* stmt) {
         if (Proc_ && Proc_->OwningObject) {
             contextMsg += " in proc " + Proc_->OwningObject->Path.ToString() + "/" + Proc_->Name;
         }
-        Compiler_->ForcedWarning(contextMsg);
-        return false;
+        // Compiler_->ForcedWarning(contextMsg);
+        return true;
     }
     
     // Jump to the continue point (usually loop start or increment section)
@@ -550,10 +550,37 @@ bool DMStatementCompiler::CompileForIn(DMASTProcStatementForIn* stmt) {
         return false;
     }
     
-    // Step 2: Create list enumerator
+    // Step 2: Create list enumerator (possibly filtered by type)
     int enumeratorId = Proc_->GetNextEnumeratorId();
-    Writer_->CreateListEnumerator(enumeratorId);
-    Writer_->ResizeStack(-1);  // CreateListEnumerator pops the list
+    
+    // Check if we have a type filter from the variable declaration
+    if (stmt->VarDecl.TypePath.has_value()) {
+        // Use filtered enumerator with type path
+        DreamPath filterPath = stmt->VarDecl.TypePath.value();
+        std::string filterPathStr = filterPath.ToString();
+        
+        // Look up the type ID for the filter path
+        DMObjectTree* objectTree = Compiler_->GetObjectTree();
+        int filterTypeId = -1;
+        if (objectTree) {
+            int typeId;
+            if (objectTree->TryGetTypeId(filterPath, typeId)) {
+                filterTypeId = typeId;
+            }
+        }
+        
+        // If type exists, use filtered enumerator; otherwise fall back to regular enumerator
+        if (filterTypeId >= 0) {
+            Writer_->CreateFilteredListEnumerator(enumeratorId, filterTypeId, filterPathStr);
+        } else {
+            // Type not found, use regular enumerator (let runtime handle filtering)
+            Writer_->CreateListEnumerator(enumeratorId);
+        }
+    } else {
+        // No type filter - use regular list enumerator
+        Writer_->CreateListEnumerator(enumeratorId);
+    }
+    Writer_->ResizeStack(-1);  // CreateListEnumerator/CreateFilteredListEnumerator pops the list
     
     // Step 3: Create labels for the loop
     std::string loopLabel = NewLabel();

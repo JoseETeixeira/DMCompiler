@@ -138,6 +138,145 @@ void TestOperators() {
     std::cout << "TestOperators passed!" << std::endl;
 }
 
+void TestCompoundAssignmentOperators() {
+    // Test three-character compound assignment operators
+    std::string source = "||= &&= %%= ...";
+    DMLexer lexer("test.dm", source);
+    
+    Token tok1 = lexer.GetNextToken();
+    assert(tok1.Type == TokenType::OrOrAssign);
+    assert(tok1.Text == "||=");
+    
+    Token tok2 = lexer.GetNextToken();
+    assert(tok2.Type == TokenType::AndAndAssign);
+    assert(tok2.Text == "&&=");
+    
+    Token tok3 = lexer.GetNextToken();
+    assert(tok3.Type == TokenType::ModuloModuloAssign);
+    assert(tok3.Text == "%%=");
+    
+    Token tok4 = lexer.GetNextToken();
+    assert(tok4.Type == TokenType::DotDotDot);
+    assert(tok4.Text == "...");
+    
+    std::cout << "TestCompoundAssignmentOperators passed!" << std::endl;
+}
+
+void TestAssignIntoOperator() {
+    // Test the := operator
+    std::string source = "x := 5";
+    DMLexer lexer("test.dm", source);
+    
+    Token tok1 = lexer.GetNextToken();
+    assert(tok1.Type == TokenType::Identifier);
+    assert(tok1.Text == "x");
+    
+    Token tok2 = lexer.GetNextToken();
+    assert(tok2.Type == TokenType::AssignInto);
+    assert(tok2.Text == ":=");
+    
+    Token tok3 = lexer.GetNextToken();
+    assert(tok3.Type == TokenType::Number);
+    
+    std::cout << "TestAssignIntoOperator passed!" << std::endl;
+}
+
+void TestTildeOperators() {
+    // Test the tilde comparison operators ~= and ~!
+    std::string source = "~= ~!";
+    DMLexer lexer("test.dm", source);
+    
+    Token tok1 = lexer.GetNextToken();
+    assert(tok1.Type == TokenType::TildeEquals);
+    assert(tok1.Text == "~=");
+    
+    Token tok2 = lexer.GetNextToken();
+    assert(tok2.Type == TokenType::TildeExclamation);
+    assert(tok2.Text == "~!");
+    
+    std::cout << "TestTildeOperators passed!" << std::endl;
+}
+
+void TestNullConditionalOperators() {
+    // Test the null-conditional operators ?. ?: ?[
+    std::string source = "?. ?: ?[";
+    DMLexer lexer("test.dm", source);
+    
+    Token tok1 = lexer.GetNextToken();
+    assert(tok1.Type == TokenType::QuestionDot);
+    assert(tok1.Text == "?.");
+    
+    Token tok2 = lexer.GetNextToken();
+    assert(tok2.Type == TokenType::QuestionColon);
+    assert(tok2.Text == "?:");
+    
+    Token tok3 = lexer.GetNextToken();
+    assert(tok3.Type == TokenType::QuestionBracket);
+    assert(tok3.Text == "?[");
+    
+    std::cout << "TestNullConditionalOperators passed!" << std::endl;
+}
+
+void TestNewTokensInContext() {
+    // Test new tokens in a realistic context
+    std::string source = "obj?.var ?: default\na ||= b\nlist?[0]";
+    DMLexer lexer("test.dm", source);
+    
+    // Line 1: obj?.var ?: default
+    Token tok1 = lexer.GetNextToken();
+    assert(tok1.Type == TokenType::Identifier);
+    assert(tok1.Text == "obj");
+    
+    Token tok2 = lexer.GetNextToken();
+    assert(tok2.Type == TokenType::QuestionDot);
+    
+    Token tok3 = lexer.GetNextToken();
+    assert(tok3.Type == TokenType::Identifier);
+    assert(tok3.Text == "var");
+    
+    Token tok4 = lexer.GetNextToken();
+    assert(tok4.Type == TokenType::QuestionColon);
+    
+    Token tok5 = lexer.GetNextToken();
+    assert(tok5.Type == TokenType::Identifier);
+    assert(tok5.Text == "default");
+    
+    Token newline1 = lexer.GetNextToken();
+    assert(newline1.Type == TokenType::Newline);
+    
+    // Line 2: a ||= b
+    Token tok6 = lexer.GetNextToken();
+    assert(tok6.Type == TokenType::Identifier);
+    assert(tok6.Text == "a");
+    
+    Token tok7 = lexer.GetNextToken();
+    assert(tok7.Type == TokenType::OrOrAssign);
+    
+    Token tok8 = lexer.GetNextToken();
+    assert(tok8.Type == TokenType::Identifier);
+    assert(tok8.Text == "b");
+    
+    Token newline2 = lexer.GetNextToken();
+    assert(newline2.Type == TokenType::Newline);
+    
+    // Line 3: list?[0]
+    Token tok9 = lexer.GetNextToken();
+    assert(tok9.Type == TokenType::Identifier);
+    assert(tok9.Text == "list");
+    
+    Token tok10 = lexer.GetNextToken();
+    assert(tok10.Type == TokenType::QuestionBracket);
+    
+    Token tok11 = lexer.GetNextToken();
+    assert(tok11.Type == TokenType::Number);
+    assert(tok11.Value.IntValue == 0);
+    
+    Token tok12 = lexer.GetNextToken();
+    assert(tok12.Type == TokenType::RightBracket);
+    
+    std::cout << "TestNewTokensInContext passed!" << std::endl;
+}
+
 int RunLexerTests() {
     std::cout << "\n=== Running Lexer Tests ===" << std::endl;
     
@@ -147,6 +286,11 @@ int RunLexerTests() {
         TestNumbers();
         TestComments();
         TestOperators();
+        TestCompoundAssignmentOperators();
+        TestAssignIntoOperator();
+        TestTildeOperators();
+        TestNullConditionalOperators();
+        TestNewTokensInContext();
         
         std::cout << "\nAll lexer tests passed!" << std::endl;
         return 0;

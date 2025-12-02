@@ -44,6 +44,18 @@ public:
         bool NeedsStackTarget;  // For Field/Index (target already on stack)
     };
     
+    /// <summary>
+    /// Result of compiling call arguments, including named argument support.
+    /// Used by CompileCallArguments() to return comprehensive argument info.
+    /// </summary>
+    struct CallArgumentsResult {
+        int positionalCount = 0;     ///< Number of positional arguments
+        int namedCount = 0;          ///< Number of named arguments
+        int totalCount = 0;          ///< positionalCount + namedCount
+        DMCallArgumentsType argsType = DMCallArgumentsType::None;  ///< None, FromStack, or FromStackKeyed
+        bool success = true;         ///< Compilation succeeded
+    };
+    
     // Analyze an expression as an LValue
     LValueInfo ResolveLValue(DMASTExpression* expr);
     
@@ -56,6 +68,7 @@ private:
     bool CompileConstantInteger(DMASTConstantInteger* expr);
     bool CompileConstantFloat(DMASTConstantFloat* expr);
     bool CompileConstantString(DMASTConstantString* expr);
+    bool CompileConstantResource(DMASTConstantResource* expr);
     bool CompileConstantNull(DMASTConstantNull* expr);
     bool CompileConstantPath(DMASTConstantPath* expr);
     
@@ -79,6 +92,15 @@ private:
     
     // Call helpers
     bool CompileCallTarget(DMASTExpression* target);
+    
+    /// <summary>
+    /// Compile call arguments, handling both positional and named arguments.
+    /// Emits positional arguments first, then named arguments as (key_string, value) pairs.
+    /// </summary>
+    /// <param name="params">The call parameters to compile</param>
+    /// <returns>CallArgumentsResult with counts, argument type, and success status</returns>
+    CallArgumentsResult CompileCallArguments(
+        const std::vector<std::unique_ptr<DMASTCallParameter>>& params);
 
     // Built-in functions
     bool CompileLocate(DMASTCall* expr);

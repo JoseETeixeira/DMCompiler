@@ -82,6 +82,22 @@ add_executable(test_stack_safety_driver
 target_link_libraries(test_stack_safety_driver PRIVATE DMCompilerLib)
 target_include_directories(test_stack_safety_driver PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
+# Standalone proc resolution test (inheritance chain lookup)
+add_executable(test_proc_resolution
+    test_proc_resolution.cpp
+)
+
+target_link_libraries(test_proc_resolution PRIVATE DMCompilerLib)
+target_include_directories(test_proc_resolution PRIVATE ${CMAKE_SOURCE_DIR}/src)
+
+# Standalone variable override test
+add_executable(test_var_override
+    test_var_override.cpp
+)
+
+target_link_libraries(test_var_override PRIVATE DMCompilerLib)
+target_include_directories(test_var_override PRIVATE ${CMAKE_SOURCE_DIR}/src)
+
 # Add test data directory
 file(COPY testdata DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 file(COPY test_files DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
@@ -102,6 +118,8 @@ add_test(NAME GotoForwardRefTests COMMAND dm_compiler_tests [gotoforward])
 add_test(NAME BuiltinRegistryTests COMMAND test_builtin_registry)
 add_test(NAME IstypeVariadicTests COMMAND test_istype_variadic)
 add_test(NAME TypeResolutionTests COMMAND test_type_resolution_driver)
+add_test(NAME ProcResolutionTests COMMAND test_proc_resolution)
+add_test(NAME VarOverrideTests COMMAND test_var_override)
 # Disabled: Takes too long to run, not related to core compiler functionality
 # add_test(NAME ExampleCompilationTests COMMAND dm_compiler_tests [examples])
 # set_tests_properties(ExampleCompilationTests PROPERTIES TIMEOUT 60)

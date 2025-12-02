@@ -891,6 +891,126 @@ bool TestFunctionCall() {
     return true;
 }
 
+// Test: func(name = value) - named parameters
+bool TestNamedParameters() {
+    std::cout << "  TestNamedParameters... ";
+    
+    auto expr = ParseExpression("do_thing(target = player, amount = 5)");
+    if (!expr) {
+        std::cerr << "FAILED: Parse returned null" << std::endl;
+        return false;
+    }
+    
+    // Should be a call
+    auto* call = dynamic_cast<DMCompiler::DMASTCall*>(expr.get());
+    if (!call) {
+        std::cerr << "FAILED: Not a call" << std::endl;
+        return false;
+    }
+    
+    // Target should be 'do_thing'
+    auto* func = dynamic_cast<DMCompiler::DMASTIdentifier*>(call->Target.get());
+    if (!func || func->Identifier != "do_thing") {
+        std::cerr << "FAILED: Target is not 'do_thing'" << std::endl;
+        return false;
+    }
+    
+    // Should have 2 parameters
+    if (call->Parameters.size() != 2) {
+        std::cerr << "FAILED: Expected 2 parameters, got " << call->Parameters.size() << std::endl;
+        return false;
+    }
+    
+    // First parameter should be named 'target' with value 'player'
+    if (!call->Parameters[0]->Key) {
+        std::cerr << "FAILED: First parameter has no key (not a named parameter)" << std::endl;
+        return false;
+    }
+    auto* key1 = dynamic_cast<DMCompiler::DMASTIdentifier*>(call->Parameters[0]->Key.get());
+    if (!key1 || key1->Identifier != "target") {
+        std::cerr << "FAILED: First parameter key is not 'target'" << std::endl;
+        return false;
+    }
+    auto* value1 = dynamic_cast<DMCompiler::DMASTIdentifier*>(call->Parameters[0]->Value.get());
+    if (!value1 || value1->Identifier != "player") {
+        std::cerr << "FAILED: First parameter value is not 'player'" << std::endl;
+        return false;
+    }
+    
+    // Second parameter should be named 'amount' with value 5
+    if (!call->Parameters[1]->Key) {
+        std::cerr << "FAILED: Second parameter has no key (not a named parameter)" << std::endl;
+        return false;
+    }
+    auto* key2 = dynamic_cast<DMCompiler::DMASTIdentifier*>(call->Parameters[1]->Key.get());
+    if (!key2 || key2->Identifier != "amount") {
+        std::cerr << "FAILED: Second parameter key is not 'amount'" << std::endl;
+        return false;
+    }
+    auto* value2 = dynamic_cast<DMCompiler::DMASTConstantInteger*>(call->Parameters[1]->Value.get());
+    if (!value2 || value2->Value != 5) {
+        std::cerr << "FAILED: Second parameter value is not 5" << std::endl;
+        return false;
+    }
+    
+    std::cout << "PASSED" << std::endl;
+    return true;
+}
+
+// Test: mixed positional and named parameters
+bool TestMixedParameters() {
+    std::cout << "  TestMixedParameters... ";
+    
+    auto expr = ParseExpression("create(item, count = 3)");
+    if (!expr) {
+        std::cerr << "FAILED: Parse returned null" << std::endl;
+        return false;
+    }
+    
+    // Should be a call
+    auto* call = dynamic_cast<DMCompiler::DMASTCall*>(expr.get());
+    if (!call) {
+        std::cerr << "FAILED: Not a call" << std::endl;
+        return false;
+    }
+    
+    // Should have 2 parameters
+    if (call->Parameters.size() != 2) {
+        std::cerr << "FAILED: Expected 2 parameters, got " << call->Parameters.size() << std::endl;
+        return false;
+    }
+    
+    // First parameter should be positional (no key)
+    if (call->Parameters[0]->Key) {
+        std::cerr << "FAILED: First parameter should be positional (has unexpected key)" << std::endl;
+        return false;
+    }
+    auto* value1 = dynamic_cast<DMCompiler::DMASTIdentifier*>(call->Parameters[0]->Value.get());
+    if (!value1 || value1->Identifier != "item") {
+        std::cerr << "FAILED: First parameter value is not 'item'" << std::endl;
+        return false;
+    }
+    
+    // Second parameter should be named 'count' with value 3
+    if (!call->Parameters[1]->Key) {
+        std::cerr << "FAILED: Second parameter has no key (not a named parameter)" << std::endl;
+        return false;
+    }
+    auto* key2 = dynamic_cast<DMCompiler::DMASTIdentifier*>(call->Parameters[1]->Key.get());
+    if (!key2 || key2->Identifier != "count") {
+        std::cerr << "FAILED: Second parameter key is not 'count'" << std::endl;
+        return false;
+    }
+    auto* value2 = dynamic_cast<DMCompiler::DMASTConstantInteger*>(call->Parameters[1]->Value.get());
+    if (!value2 || value2->Value != 3) {
+        std::cerr << "FAILED: Second parameter value is not 3" << std::endl;
+        return false;
+    }
+    
+    std::cout << "PASSED" << std::endl;
+    return true;
+}
+
 // Test: array[index]
 bool TestArrayIndexing() {
     std::cout << "  TestArrayIndexing... ";
@@ -1066,7 +1186,12 @@ bool TestNewExpression() {
         return false;
     }
     
-    std::string pathStr = newExpr->Path->Path.Path.ToString();
+    auto* constPath = dynamic_cast<DMCompiler::DMASTConstantPath*>(newExpr->Path.get());
+    if (!constPath) {
+        std::cerr << "FAILED: Path is not a constant path" << std::endl;
+        return false;
+    }
+    std::string pathStr = constPath->Path.Path.ToString();
     if (pathStr != "/mob/player") {
         std::cerr << "FAILED: Path is '" << pathStr << "', expected '/mob/player'" << std::endl;
         return false;
@@ -2571,6 +2696,8 @@ int RunParserTests() {
     std::cout << "\nPostfix Expression Tests:" << std::endl;
     if (TestMemberAccess()) passed++; else failed++;
     if (TestFunctionCall()) passed++; else failed++;
+    if (TestNamedParameters()) passed++; else failed++;
+    if (TestMixedParameters()) passed++; else failed++;
     if (TestArrayIndexing()) passed++; else failed++;
     if (TestChainedPostfix()) passed++; else failed++;
     

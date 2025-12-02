@@ -100,6 +100,19 @@ enum class TokenType {
     XorAssign,
     LeftShiftAssign,
     RightShiftAssign,
+    OrOrAssign,         // ||=
+    AndAndAssign,       // &&=
+    ModuloModuloAssign, // %%=
+    AssignInto,         // :=
+    
+    // Comparison operators
+    TildeEquals,        // ~= (case-insensitive string comparison)
+    TildeExclamation,   // ~! (case-insensitive string non-comparison)
+    
+    // Null-conditional operators
+    QuestionDot,        // ?. (null-conditional member access)
+    QuestionColon,      // ?: (null-coalescing/Elvis operator)
+    QuestionBracket,    // ?[ (null-conditional index access)
     
     // Increment/Decrement
     Increment,

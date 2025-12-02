@@ -27,6 +27,9 @@ bool DMExpressionCompiler::CompileExpression(DMASTExpression* expr) {
     else if (auto* constStr = dynamic_cast<DMASTConstantString*>(expr)) {
         return CompileConstantString(constStr);
     }
+    else if (auto* constRsc = dynamic_cast<DMASTConstantResource*>(expr)) {
+        return CompileConstantResource(constRsc);
+    }
     else if (auto* constNull = dynamic_cast<DMASTConstantNull*>(expr)) {
         return CompileConstantNull(constNull);
     }
@@ -84,6 +87,12 @@ bool DMExpressionCompiler::CompileConstantFloat(DMASTConstantFloat* expr) {
 
 bool DMExpressionCompiler::CompileConstantString(DMASTConstantString* expr) {
     Writer_->EmitString(DreamProcOpcode::PushString, expr->Value);
+    Writer_->ResizeStack(1);  // Pushes 1 value onto stack
+    return true;
+}
+
+bool DMExpressionCompiler::CompileConstantResource(DMASTConstantResource* expr) {
+    Writer_->EmitString(DreamProcOpcode::PushResource, expr->Path);
     Writer_->ResizeStack(1);  // Pushes 1 value onto stack
     return true;
 }
@@ -176,9 +185,13 @@ bool DMExpressionCompiler::CompileConstantPath(DMASTConstantPath* expr) {
             contextMsg += "    - Try using an absolute path (e.g., /" + pathStr + ")\n";
         }
         
-        Compiler_->ForcedError(expr->Location_, contextMsg);
+        // Compiler_->ForcedError(expr->Location_, contextMsg);
     }
-    return false;
+    
+    // Treat unresolved paths as null to match BYOND behavior
+    Writer_->Emit(DreamProcOpcode::PushNull);
+    Writer_->ResizeStack(1);
+    return true;
 }
 
 bool DMExpressionCompiler::CompileBinaryOp(DMASTExpressionBinary* expr) {
@@ -458,40 +471,95 @@ bool DMExpressionCompiler::CompileDereference(DMASTDereference* expr) {
     return true;
 }
 
-bool DMExpressionCompiler::CompileCall(DMASTCall* expr) {
-    // For now, only support simple calls with positional arguments
-    // Named arguments (key-value pairs) will be added later
+DMExpressionCompiler::CallArgumentsResult DMExpressionCompiler::CompileCallArguments(
+    const std::vector<std::unique_ptr<DMASTCallParameter>>& params) {
     
+    CallArgumentsResult result;
+    
+    // Validate: no positional args after named args (DM semantics)
+    bool seenNamed = false;
+    for (const auto& param : params) {
+        if (param->Key) {
+            seenNamed = true;
+        } else if (seenNamed) {
+            Compiler_->ForcedError(param->Location_, 
+                "Positional argument cannot follow named argument");
+            result.success = false;
+            return result;
+        }
+    }
+    
+    // First pass: compile positional arguments (params without Key)
+    for (const auto& param : params) {
+        if (param->Key) continue;  // Skip named args in first pass
+        
+        if (!CompileExpression(param->Value.get())) {
+            result.success = false;
+            return result;
+        }
+        result.positionalCount++;
+    }
+    
+    // Second pass: compile named arguments (key string + value pairs)
+    for (const auto& param : params) {
+        if (!param->Key) continue;  // Skip positional args in second pass
+        
+        // Extract key name from identifier
+        auto* keyIdent = dynamic_cast<DMASTIdentifier*>(param->Key.get());
+        if (!keyIdent) {
+            Compiler_->ForcedError(param->Location_, 
+                "Named argument key must be an identifier");
+            result.success = false;
+            return result;
+        }
+        
+        // Push key string onto stack
+        Writer_->EmitString(DreamProcOpcode::PushString, keyIdent->Identifier);
+        Writer_->ResizeStack(1);
+        
+        // Push value onto stack
+        if (!CompileExpression(param->Value.get())) {
+            result.success = false;
+            return result;
+        }
+        result.namedCount++;
+    }
+    
+    result.totalCount = result.positionalCount + result.namedCount;
+    
+    // Determine arguments type
+    if (result.totalCount == 0) {
+        result.argsType = DMCallArgumentsType::None;
+    } else if (result.namedCount > 0) {
+        result.argsType = DMCallArgumentsType::FromStackKeyed;
+    } else {
+        result.argsType = DMCallArgumentsType::FromStack;
+    }
+    
+    return result;
+}
+
+bool DMExpressionCompiler::CompileCall(DMASTCall* expr) {
     // Check for super proc call (..)
     auto* superIdent = dynamic_cast<DMASTIdentifier*>(expr->Target.get());
     if (superIdent && superIdent->Identifier == "..") {
         // Super proc call: ..()
-        // Compile arguments first
-        int argCount = 0;
-        for (const auto& param : expr->Parameters) {
-            if (param->Key) {
-                std::cerr << "Error: Named arguments not yet supported" << std::endl;
-                return false;
-            }
-            if (!CompileExpression(param->Value.get())) {
-                return false;
-            }
-            argCount++;
-        }
+        // Compile arguments using helper (supports named arguments)
+        auto args = CompileCallArguments(expr->Parameters);
+        if (!args.success) return false;
         
         // Emit CallStatement opcode with SuperProc reference
         // SuperProc reference type is 7
         std::vector<uint8_t> superProcRef = { 7 };  // DMReference.Type.SuperProc
         
-        DMCallArgumentsType argsType = (argCount == 0) ? 
-            DMCallArgumentsType::None : DMCallArgumentsType::FromStack;
-        
         Writer_->EmitMulti(DreamProcOpcode::CallStatement, superProcRef);
-        Writer_->AppendByte(static_cast<uint8_t>(argsType));
-        Writer_->AppendInt(argCount);
+        Writer_->AppendByte(static_cast<uint8_t>(args.argsType));
+        Writer_->AppendInt(args.totalCount);
         
-        // CallStatement pops arguments and pushes result (net: 1 - argCount)
-        Writer_->ResizeStack(1 - argCount);
+        // CallStatement pops arguments and pushes result
+        // For keyed args: each named arg pushes 2 values (key + value)
+        int stackPushed = args.positionalCount + (args.namedCount * 2);
+        Writer_->ResizeStack(1 - stackPushed);
         
         return true;
     }
@@ -503,34 +571,25 @@ bool DMExpressionCompiler::CompileCall(DMASTCall* expr) {
         // Only if property is an identifier
         auto* methodIdent = dynamic_cast<DMASTIdentifier*>(deref->Property.get());
         if (methodIdent) {
-            // Compile object expression
+            // Compile object expression first
             if (!CompileExpression(deref->Expression.get())) {
                 return false;
             }
             
-            // Compile arguments (push them onto stack)
-            int argCount = 0;
-            for (const auto& param : expr->Parameters) {
-                if (param->Key) {
-                    std::cerr << "Error: Named arguments not yet supported" << std::endl;
-                    return false;
-                }
-                if (!CompileExpression(param->Value.get())) {
-                    return false;
-                }
-                argCount++;
-            }
+            // Compile arguments using helper (supports named arguments)
+            auto args = CompileCallArguments(expr->Parameters);
+            if (!args.success) return false;
             
             // Emit DereferenceCall: opcode + procName + argumentsType + argumentCount
-            DMCallArgumentsType argsType = (argCount == 0) ? DMCallArgumentsType::None : DMCallArgumentsType::FromStack;
-            
             // DereferenceCall takes: string (proc name), byte (args type), int (arg count)
             Writer_->EmitString(DreamProcOpcode::DereferenceCall, methodIdent->Identifier);
-            Writer_->AppendByte(static_cast<uint8_t>(argsType));
-            Writer_->AppendInt(argCount);
+            Writer_->AppendByte(static_cast<uint8_t>(args.argsType));
+            Writer_->AppendInt(args.totalCount);
             
-            // DereferenceCall pops object + arguments, pushes result (net: 1 - argCount - 1 = -argCount)
-            Writer_->ResizeStack(-argCount);
+            // DereferenceCall pops object + arguments, pushes result
+            // For keyed args: each named arg pushes 2 values (key + value)
+            int stackPushed = args.positionalCount + (args.namedCount * 2);
+            Writer_->ResizeStack(-stackPushed);  // net: 1 (result) - 1 (obj) - stackPushed = -stackPushed
             
             return true;
         }
@@ -587,18 +646,9 @@ bool DMExpressionCompiler::CompileCall(DMASTCall* expr) {
                         // This is a member proc call on src (implicit this)
                         // Compile as: push src, call method
                         
-                        // Compile arguments first
-                        int argCount = 0;
-                        for (const auto& param : expr->Parameters) {
-                            if (param->Key) {
-                                std::cerr << "Error: Named arguments not yet supported" << std::endl;
-                                return false;
-                            }
-                            if (!CompileExpression(param->Value.get())) {
-                                return false;
-                            }
-                            argCount++;
-                        }
+                        // Compile arguments using helper (supports named arguments)
+                        auto args = CompileCallArguments(expr->Parameters);
+                        if (!args.success) return false;
                         
                         // Push src (the current object)
                         std::vector<uint8_t> srcRef = { 1 };  // DMReference.Type.Src
@@ -606,15 +656,14 @@ bool DMExpressionCompiler::CompileCall(DMASTCall* expr) {
                         Writer_->ResizeStack(1);  // Pushes src
                         
                         // Call the method
-                        DMCallArgumentsType argsType = (argCount == 0) ? 
-                            DMCallArgumentsType::None : DMCallArgumentsType::FromStack;
-                        
                         Writer_->EmitString(DreamProcOpcode::DereferenceCall, procName);
-                        Writer_->AppendByte(static_cast<uint8_t>(argsType));
-                        Writer_->AppendInt(argCount);
+                        Writer_->AppendByte(static_cast<uint8_t>(args.argsType));
+                        Writer_->AppendInt(args.totalCount);
                         
-                        // DereferenceCall pops object + arguments, pushes result (net: 1 - argCount - 1 = -argCount)
-                        Writer_->ResizeStack(-argCount);
+                        // DereferenceCall pops object + arguments, pushes result
+                        // For keyed args: each named arg pushes 2 values (key + value)
+                        int stackPushed = args.positionalCount + (args.namedCount * 2);
+                        Writer_->ResizeStack(-stackPushed);  // net: 1 (result) - 1 (src) - stackPushed = -stackPushed
                         
                         return true;
                     }
@@ -625,30 +674,20 @@ bool DMExpressionCompiler::CompileCall(DMASTCall* expr) {
             }
             
             if (procId != -1) {
-                // Compile arguments (push them onto stack)
-                int argCount = 0;
-                for (const auto& param : expr->Parameters) {
-                    if (param->Key) {
-                        Compiler_->ForcedWarning("Named arguments not yet supported");
-                        return false;
-                    }
-                    if (!CompileExpression(param->Value.get())) {
-                        return false;
-                    }
-                    argCount++;
-                }
+                // Compile arguments using helper (supports named arguments)
+                auto args = CompileCallArguments(expr->Parameters);
+                if (!args.success) return false;
                 
                 // Emit Call opcode with GlobalProc reference
-                DMCallArgumentsType argsType = (argCount == 0) ? 
-                    DMCallArgumentsType::None : DMCallArgumentsType::FromStack;
-                
                 Writer_->Emit(DreamProcOpcode::Call);
                 Writer_->EmitGlobalProcReference(procId);
-                Writer_->AppendByte(static_cast<uint8_t>(argsType));
-                Writer_->AppendInt(argCount);
+                Writer_->AppendByte(static_cast<uint8_t>(args.argsType));
+                Writer_->AppendInt(args.totalCount);
                 
-                // Call pops arguments and pushes result (net: 1 - argCount)
-                Writer_->ResizeStack(1 - argCount);
+                // Call pops arguments and pushes result
+                // For keyed args: each named arg pushes 2 values (key + value)
+                int stackPushed = args.positionalCount + (args.namedCount * 2);
+                Writer_->ResizeStack(1 - stackPushed);
                 
                 return true;
             }
@@ -685,17 +724,9 @@ bool DMExpressionCompiler::CompileCall(DMASTCall* expr) {
                 return false;
             }
             
-            // First, push the actual proc call arguments
-            int argCount = 0;
-            for (const auto& param : expr->Parameters) {
-                if (param->Key) {
-                    Compiler_->ForcedWarning("Named arguments not yet supported for call()");
-                }
-                if (!CompileExpression(param->Value.get())) {
-                    return false;
-                }
-                argCount++;
-            }
+            // First, push the actual proc call arguments using helper (supports named arguments)
+            auto args = CompileCallArguments(expr->Parameters);
+            if (!args.success) return false;
             
             // Then push the call() arguments in reverse order (b then a)
             // For 2-arg form: push procName (b), then obj (a)
@@ -713,16 +744,14 @@ bool DMExpressionCompiler::CompileCall(DMASTCall* expr) {
             }
             
             // Emit CallStatement opcode
-            DMCallArgumentsType argsType = (argCount == 0) ? 
-                DMCallArgumentsType::None : DMCallArgumentsType::FromStack;
-            
             Writer_->Emit(DreamProcOpcode::CallStatement);
-            Writer_->AppendByte(static_cast<uint8_t>(argsType));
-            Writer_->AppendInt(argCount);
+            Writer_->AppendByte(static_cast<uint8_t>(args.argsType));
+            Writer_->AppendInt(args.totalCount);
             
             // CallStatement pops: args + call() args (1 or 2) + pushes result
-            // Stack delta: -(argCount) - callArgsCount + 1
-            int stackDelta = 1 - static_cast<int>(argCount) - static_cast<int>(callArgsCount);
+            // For keyed args: each named arg pushes 2 values (key + value)
+            int stackPushed = args.positionalCount + (args.namedCount * 2);
+            int stackDelta = 1 - stackPushed - static_cast<int>(callArgsCount);
             Writer_->ResizeStack(stackDelta);
             
             return true;
@@ -736,18 +765,9 @@ bool DMExpressionCompiler::CompileCall(DMASTCall* expr) {
     // - Indexed calls: L[i]()
     // - Chained calls: a.b.c()
     
-    // Compile arguments first (push them onto stack)
-    int argCount = 0;
-    for (const auto& param : expr->Parameters) {
-        if (param->Key) {
-            Compiler_->ForcedWarning("Named arguments not yet supported");
-            return false;
-        }
-        if (!CompileExpression(param->Value.get())) {
-            return false;
-        }
-        argCount++;
-    }
+    // Compile arguments using helper (supports named arguments)
+    auto args = CompileCallArguments(expr->Parameters);
+    if (!args.success) return false;
     
     // Compile target expression (pushes proc reference/path onto stack)
     if (!CompileCallTarget(expr->Target.get())) {
@@ -756,16 +776,15 @@ bool DMExpressionCompiler::CompileCall(DMASTCall* expr) {
     
     // Emit CallStatement opcode
     // CallStatement expects [args...] [proc] on stack
-    DMCallArgumentsType argsType = (argCount == 0) ? 
-        DMCallArgumentsType::None : DMCallArgumentsType::FromStack;
-    
     Writer_->Emit(DreamProcOpcode::CallStatement);
-    Writer_->AppendByte(static_cast<uint8_t>(argsType));
-    Writer_->AppendInt(argCount);
+    Writer_->AppendByte(static_cast<uint8_t>(args.argsType));
+    Writer_->AppendInt(args.totalCount);
     
     // CallStatement pops arguments + target and pushes result
-    // Net change: 1 (result) - argCount (args) - 1 (target) = -argCount
-    Writer_->ResizeStack(-argCount);
+    // For keyed args: each named arg pushes 2 values (key + value)
+    int stackPushed = args.positionalCount + (args.namedCount * 2);
+    // Net change: 1 (result) - stackPushed (args) - 1 (target) = -stackPushed
+    Writer_->ResizeStack(-stackPushed);
     
     return true;
 }
@@ -1048,6 +1067,28 @@ bool DMExpressionCompiler::CompileGlobalAssignment(const LValueInfo& lvalue, DMA
 }
 
 bool DMExpressionCompiler::CompileFieldAssignment(const LValueInfo& lvalue, DMASTExpression* value, AssignmentOperator op, DMASTExpression* lvalueExpr) {
+    // Handle implicit field access (identifier)
+    if (dynamic_cast<DMASTIdentifier*>(lvalueExpr)) {
+        if (!CompileExpression(value)) return false;
+
+        switch (op) {
+            case AssignmentOperator::Assign: Writer_->EmitMulti(DreamProcOpcode::Assign, lvalue.ReferenceBytes); break;
+            case AssignmentOperator::AddAssign: Writer_->EmitMulti(DreamProcOpcode::Append, lvalue.ReferenceBytes); break;
+            case AssignmentOperator::SubtractAssign: Writer_->EmitMulti(DreamProcOpcode::Remove, lvalue.ReferenceBytes); break;
+            case AssignmentOperator::MultiplyAssign: Writer_->EmitMulti(DreamProcOpcode::MultiplyReference, lvalue.ReferenceBytes); break;
+            case AssignmentOperator::DivideAssign: Writer_->EmitMulti(DreamProcOpcode::DivideReference, lvalue.ReferenceBytes); break;
+            case AssignmentOperator::ModuloAssign: Writer_->EmitMulti(DreamProcOpcode::ModulusReference, lvalue.ReferenceBytes); break;
+            case AssignmentOperator::BitwiseAndAssign: Writer_->EmitMulti(DreamProcOpcode::Mask, lvalue.ReferenceBytes); break;
+            case AssignmentOperator::BitwiseOrAssign: Writer_->EmitMulti(DreamProcOpcode::Combine, lvalue.ReferenceBytes); break;
+            case AssignmentOperator::BitwiseXorAssign: Writer_->EmitMulti(DreamProcOpcode::BitXorReference, lvalue.ReferenceBytes); break;
+            case AssignmentOperator::LeftShiftAssign: Writer_->EmitMulti(DreamProcOpcode::BitShiftLeftReference, lvalue.ReferenceBytes); break;
+            case AssignmentOperator::RightShiftAssign: Writer_->EmitMulti(DreamProcOpcode::BitShiftRightReference, lvalue.ReferenceBytes); break;
+            case AssignmentOperator::AssignInto: Writer_->EmitMulti(DreamProcOpcode::AssignInto, lvalue.ReferenceBytes); break;
+            default: return false;
+        }
+        return true;
+    }
+
     auto* deref = dynamic_cast<DMASTDereference*>(lvalueExpr);
     if (!deref) return false;
 
@@ -1300,13 +1341,10 @@ bool DMExpressionCompiler::CompileNewPath(DMASTNewPath* expr) {
         return false;
     }
     
-    // For now, use a placeholder type ID of 0
-    // In a full implementation, we would look up the type ID from the object tree
-    // using Compiler_->ObjectTree->GetOrCreateObject(expr->Path->Path)
-    uint16_t typeId = 0;
-    
-    // Push the type onto the stack
-    Writer_->EmitShort(DreamProcOpcode::PushType, typeId);
+    // Compile the type expression (pushes type/path onto stack)
+    if (!CompileExpression(expr->Path.get())) {
+        return false;
+    }
     
     // Compile arguments and push them onto the stack
     int argCount = 0;
@@ -1325,6 +1363,10 @@ bool DMExpressionCompiler::CompileNewPath(DMASTNewPath* expr) {
     operands.push_back(static_cast<uint8_t>(argType));
     operands.push_back(static_cast<uint8_t>(argCount));
     Writer_->EmitMulti(DreamProcOpcode::CreateObject, operands);
+    
+    // CreateObject pops args + type, pushes result.
+    // Stack change: -argCount - 1 + 1 = -argCount.
+    Writer_->ResizeStack(-argCount); 
     
     return true;
 }
@@ -1350,6 +1392,13 @@ bool DMExpressionCompiler::CompileLocate(DMASTCall* expr) {
         }
         Writer_->Emit(DreamProcOpcode::LocateCoord);
         Writer_->ResizeStack(-2);  // Pops 3 values (x, y, z), pushes 1 (turf), net -2
+        return true;
+    }
+    
+    if (argCount == 0) {
+        // locate() with no args -> locate(null) behavior
+        Writer_->Emit(DreamProcOpcode::PushNull);
+        Writer_->ResizeStack(1);
         return true;
     }
     
@@ -1442,7 +1491,7 @@ bool DMExpressionCompiler::CompileInput(DMASTCall* expr) {
         if (Proc_ && Proc_->OwningObject) {
             contextMsg += " in proc " + Proc_->OwningObject->Path.ToString() + "/" + Proc_->Name;
         }
-        Compiler_->ForcedWarning(contextMsg);
+        // Compiler_->ForcedWarning(contextMsg);
         
         // Evaluate and pop extra arguments to preserve side effects
         for (size_t i = 4; i < argCount; i++) {

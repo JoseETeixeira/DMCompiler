@@ -11,6 +11,88 @@ namespace DMCompiler {
 class DMASTExpression;
 
 /// <summary>
+/// VarModifiers - Parsed Variable Modifiers
+/// 
+/// Holds the parsed modifiers extracted from a variable declaration path.
+/// In DM, variable paths can contain modifiers like:
+///   var/const/myvar = 5
+///   var/tmp/mytmp
+///   var/global/myglobal
+///   var/static/mystatic
+///   var/final/myfinal
+/// 
+/// This struct captures those modifiers and the remaining type path.
+/// </summary>
+struct VarModifiers {
+    /// Is this a global/static variable?
+    bool IsGlobal = false;
+    
+    /// Is this a const variable?
+    bool IsConst = false;
+    
+    /// Is this a final variable?
+    bool IsFinal = false;
+    
+    /// Is this a tmp variable?
+    bool IsTmp = false;
+    
+    /// Is this a static variable? (alias for global)
+    bool IsStatic = false;
+    
+    /// The remaining type path after extracting modifiers
+    /// e.g., for "var/const/mob/foo", this would be "/mob"
+    std::optional<DreamPath> TypePath;
+    
+    /// Parse variable modifiers from a DreamPath
+    /// Extracts const, tmp, global, static, final from the path elements
+    /// and returns the remaining elements as a type path.
+    /// @param varPath The variable path to parse (e.g., /var/const/mob)
+    /// @return VarModifiers with extracted flags and remaining type path
+    static VarModifiers Parse(const DreamPath& varPath) {
+        VarModifiers mods;
+        std::vector<std::string> typeElements;
+        bool passedVar = false;
+        
+        for (const auto& element : varPath.GetElements()) {
+            // Skip the "var" element itself
+            if (element == "var") {
+                passedVar = true;
+                continue;
+            }
+            
+            // Check for modifier keywords
+            if (element == "const") {
+                mods.IsConst = true;
+            }
+            else if (element == "tmp") {
+                mods.IsTmp = true;
+            }
+            else if (element == "global") {
+                mods.IsGlobal = true;
+            }
+            else if (element == "static") {
+                mods.IsStatic = true;
+                mods.IsGlobal = true; // static is an alias for global
+            }
+            else if (element == "final") {
+                mods.IsFinal = true;
+            }
+            else {
+                // This is part of the type path
+                typeElements.push_back(element);
+            }
+        }
+        
+        // Build the type path from remaining elements
+        if (!typeElements.empty()) {
+            mods.TypePath = DreamPath(DreamPath::PathType::Absolute, typeElements);
+        }
+        
+        return mods;
+    }
+};
+
+/// <summary>
 /// DMComplexValueType - Complex Variable Type Information
 /// 
 /// Allows for more complex things than DMValueType does, such as supporting type paths.

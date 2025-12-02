@@ -639,10 +639,66 @@ bool DMCompiler::ProcessVarOverride(DMASTObjectVarOverride* varOverride, const D
         std::cout << "  Overriding var: " << pathStr << varOverride->VarName << std::endl;
     }
     
-    // TODO: Find the variable and update its default value
-    // For now, just log it
+    // Find the variable and update its default value
+    return UpdateVariableDefault(obj, varOverride->VarName, varOverride->Value.get(), varOverride->Location_);
+}
+
+bool DMCompiler::UpdateVariableDefault(DMObject* obj, const std::string& varName, 
+                                        DMASTExpression* newValue, const Location& location) {
+    // Search up the inheritance hierarchy for the original variable definition
+    DMObject* current = obj;
+    while (current != nullptr) {
+        // Check if this object has the variable
+        auto varIt = current->Variables.find(varName);
+        if (varIt != current->Variables.end()) {
+            // Found the original variable definition
+            // Create an override in the target object with the new default value
+            DMVariable override = varIt->second;
+            override.Value = newValue;
+            obj->VariableOverrides[varName] = override;
+            
+            if (Settings_.Verbose) {
+                std::cout << "    Found variable '" << varName << "' in " 
+                         << current->Path.ToString() << ", creating override" << std::endl;
+            }
+            return true;
+        }
+        
+        // Check variable overrides as well (in case there's already an override chain)
+        auto overrideIt = current->VariableOverrides.find(varName);
+        if (overrideIt != current->VariableOverrides.end()) {
+            // Found a variable override - use it as the base
+            DMVariable override = overrideIt->second;
+            override.Value = newValue;
+            obj->VariableOverrides[varName] = override;
+            
+            if (Settings_.Verbose) {
+                std::cout << "    Found variable override '" << varName << "' in " 
+                         << current->Path.ToString() << ", creating override" << std::endl;
+            }
+            return true;
+        }
+        
+        // Move up to parent
+        current = current->Parent;
+    }
     
-    return true;
+    // Check global variables as fallback
+    int globalIdx = ObjectTree_->GetGlobalVariableId(varName);
+    if (globalIdx >= 0) {
+        // Found a global variable - update its default value directly
+        ObjectTree_->Globals[globalIdx].Value = newValue;
+        
+        if (Settings_.Verbose) {
+            std::cout << "    Found global variable '" << varName << "', updating default" << std::endl;
+        }
+        return true;
+    }
+    
+    // Variable not found anywhere - emit error
+    Emit(WarningCode::UnknownVariable, location, 
+         "Cannot find variable '" + varName + "' to override in type " + obj->Path.ToString() + " or its parents");
+    return false;
 }
 
 bool DMCompiler::ProcessProcDefinition(DMASTObjectProcDefinition* procDef, const DreamPath& currentPath) {

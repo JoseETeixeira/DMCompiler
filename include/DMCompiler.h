@@ -16,12 +16,14 @@ namespace DMCompiler {
 class DMObjectTree;
 class DMCodeTree;
 class DMProc;
+class DMObject;
 class DMASTFile;
 class DMASTStatement;
 class DMASTObjectDefinition;
 class DMASTObjectVarDefinition;
 class DMASTObjectVarOverride;
 class DMASTObjectProcDefinition;
+class DMASTExpression;
 struct DreamMapJson;
 
 /// <summary>
@@ -66,6 +68,7 @@ enum class WarningCode {
     PointlessScope,
     MalformedMacro,
     UnsupportedTypeCheck,
+    UnknownVariable,
     Unknown
 };
 
@@ -159,6 +162,17 @@ private:
     bool ProcessVarDefinition(DMASTObjectVarDefinition* varDef, const DreamPath& currentPath);
     bool ProcessVarOverride(DMASTObjectVarOverride* varOverride, const DreamPath& currentPath);
     bool ProcessProcDefinition(DMASTObjectProcDefinition* procDef, const DreamPath& currentPath);
+    
+    /// Update a variable's default value
+    /// Searches the inheritance chain to find the original variable definition,
+    /// then creates an override with the new default value in the target object.
+    /// @param obj The object where the override is declared
+    /// @param varName Name of the variable to override
+    /// @param newValue The new default value expression
+    /// @param location Source location for error reporting
+    /// @return true if successful, false if variable not found
+    bool UpdateVariableDefault(DMObject* obj, const std::string& varName, 
+                               DMASTExpression* newValue, const Location& location);
     
     std::vector<Token> PreprocessedTokens_;
     std::unique_ptr<DMASTFile> ParsedAST_;  // Parsed Abstract Syntax Tree

@@ -32,6 +32,13 @@ private:
     DMCompiler* Compiler_;
     DMObjectTree* ObjectTree_;
     bool LeftDMStandard_;
+    bool DMStandardFinalized_;
+
+    /// <summary>
+    /// Finalize DMStandard processing by marking all existing objects as from DMStandard.
+    /// Called when transitioning from DMStandard files to user code.
+    /// </summary>
+    void FinalizeDMStandard();
 
     /// <summary>
     /// Processes all statements in the AST

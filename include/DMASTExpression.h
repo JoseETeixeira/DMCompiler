@@ -148,6 +148,9 @@ enum class BinaryOperator {
     // Comparison
     Equal, NotEqual, Less, Greater, LessOrEqual, GreaterOrEqual,
     
+    // Equivalence (DM-specific: ~= and ~!)
+    Equivalent, NotEquivalent,
+    
     // Logical
     LogicalAnd, LogicalOr,
     
@@ -243,11 +246,11 @@ public:
 /// </summary>
 class DMASTNewPath : public DMASTExpression {
 public:
-    std::unique_ptr<DMASTConstantPath> Path;
+    std::unique_ptr<DMASTExpression> Path;
     std::vector<std::unique_ptr<DMASTCallParameter>> Parameters;
     
     DMASTNewPath(const Location& location,
-                std::unique_ptr<DMASTConstantPath> path,
+                std::unique_ptr<DMASTExpression> path,
                 std::vector<std::unique_ptr<DMASTCallParameter>> parameters = {})
         : DMASTExpression(location), Path(std::move(path)), Parameters(std::move(parameters)) {}
 };
@@ -328,6 +331,7 @@ enum class AssignmentOperator {
     RightShiftAssign,   // >>=
     LogicalAndAssign,   // &&=
     LogicalOrAssign,    // ||=
+    ModuloModuloAssign, // %%= (DM-style modulo for negative numbers)
     AssignInto          // :=
 };
 
