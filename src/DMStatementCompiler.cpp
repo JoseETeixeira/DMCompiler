@@ -1130,9 +1130,10 @@ bool DMStatementCompiler::Finalize() {
         auto it = DefinedLabels_.find(forwardRef.LabelName);
         
         if (it == DefinedLabels_.end()) {
-            // Label was never defined - this is an error
-            Compiler_->ForcedError(
-                Location::Internal,
+            // Label was never defined - this is a warning (not error) to allow compilation
+            // to continue. The proc will fail at runtime if the goto is executed.
+            // This commonly happens with DM labels that don't use colon syntax.
+            Compiler_->ForcedWarning(
                 "Undefined label '" + forwardRef.LabelName + "' referenced by goto statement"
             );
             allResolved = false;

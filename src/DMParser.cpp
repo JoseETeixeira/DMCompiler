@@ -1400,17 +1400,23 @@ std::unique_ptr<DMASTProcStatement> DMParser::ProcStatement() {
             break;
     }
     
-    // Check for labeled statement (identifier:)
-    // We need to look ahead to see if there's a colon after an identifier
+    // Check for labeled statement (identifier: or identifier on its own line)
+    // In DM, labels can be either "label:" or just "label" on its own line
+    // We need to look ahead to see if there's a colon or newline after an identifier
     if (IsInSet(Current().Type, IdentifierTypes_)) {
         // Save current position in case this isn't a label
         Token identToken = Current();
         Token afterIdent = Advance();  // Advance and save the next token
         
         if (afterIdent.Type == TokenType::Colon) {
-            // It's a label! Restore location and parse as label
+            // It's a label with colon syntax (label:)
             ReuseToken(identToken);
             return ProcStatementLabel();
+        } else if (afterIdent.Type == TokenType::Newline || afterIdent.Type == TokenType::EndOfFile) {
+            // Could be a label without colon (just "label" on its own line)
+            // This is valid DM syntax for labels
+            ReuseToken(identToken);
+            return ProcStatementLabelNoColon();
         } else {
             // Not a label, put both tokens back and continue
             // We need to restore to the state before we consumed the identifier
@@ -2199,6 +2205,24 @@ std::unique_ptr<DMASTProcStatement> DMParser::ProcStatementLabel() {
     }
     
     return std::make_unique<DMASTProcStatementLabel>(loc, labelName, std::move(body));
+}
+
+std::unique_ptr<DMASTProcStatement> DMParser::ProcStatementLabelNoColon() {
+    Location loc = CurrentLocation();
+    
+    // Parse label name (identifier on its own line, no colon)
+    if (!IsInSet(Current().Type, IdentifierTypes_)) {
+        Emit(WarningCode::BadToken, "Expected label identifier");
+        return nullptr;
+    }
+    std::string labelName = Current().Text;
+    Advance();
+    
+    // The label is followed by newline/EOF (no colon in this syntax)
+    // Don't consume the newline - let the caller handle it
+    
+    // Labels without colon never have a body on the same line
+    return std::make_unique<DMASTProcStatementLabel>(loc, labelName, nullptr);
 }
 
 // ============================================================================

@@ -780,6 +780,19 @@ bool DMCompiler::EmitBytecode() {
     
     // Iterate through all procs
     for (const auto& proc : ObjectTree_->AllProcs) {
+        // Skip procs that were already compiled in Phase 3 (DMProc::Compile)
+        if (!proc->Bytecode.empty()) {
+            if (Settings_.Verbose) {
+                std::string pathStr = proc->OwningObject->Path.ToString();
+                if (pathStr.empty() || pathStr.back() != '/') {
+                    pathStr += "/";
+                }
+                std::cout << "  Compiled proc: " << pathStr << proc->Name 
+                          << " (" << proc->Bytecode.size() << " bytes)" << std::endl;
+            }
+            continue;
+        }
+        
         if (!proc->AstBody) {
             // No body to compile (e.g., native procs)
             continue;
@@ -821,6 +834,26 @@ bool DMCompiler::EmitBytecode() {
             ForcedWarning("Failed to compile proc: " + proc->OwningObject->Path.ToString() + "/" + proc->Name);
             continue;
         }
+        
+        // Finalize statement compiler (resolve forward references for goto)
+        if (!stmtCompiler.Finalize()) {
+            ForcedWarning("Failed to finalize proc compilation: " + 
+                proc->OwningObject->Path.ToString() + "/" + proc->Name);
+            continue;
+        }
+        
+        // Add implicit return null if needed
+        const auto& bytecode = writer.GetBytecode();
+        bool needsImplicitReturn = bytecode.empty() || 
+                                   bytecode.back() != static_cast<uint8_t>(DreamProcOpcode::Return);
+        if (needsImplicitReturn) {
+            writer.Emit(DreamProcOpcode::PushNull);
+            writer.ResizeStack(1);
+            writer.Emit(DreamProcOpcode::Return);
+        }
+        
+        // Finalize bytecode (resolve jump labels)
+        writer.Finalize();
         
         // Store bytecode and max stack size
         proc->Bytecode = writer.GetBytecode();

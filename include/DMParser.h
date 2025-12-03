@@ -188,6 +188,7 @@ private:
     std::unique_ptr<DMASTProcStatement> ProcStatementContinue();
     std::unique_ptr<DMASTProcStatement> ProcStatementGoto();
     std::unique_ptr<DMASTProcStatement> ProcStatementLabel();
+    std::unique_ptr<DMASTProcStatement> ProcStatementLabelNoColon();  // Label without colon (DM syntax)
     std::unique_ptr<DMASTProcStatement> ProcStatementDel();
     std::unique_ptr<DMASTProcStatement> ProcStatementSpawn();
     std::unique_ptr<DMASTProcStatement> ProcStatementTryCatch();

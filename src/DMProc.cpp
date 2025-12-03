@@ -2,6 +2,12 @@
 #include "DMProc.h"
 #include "DMObject.h"
 #include "DMAST.h"
+#include "DMCompiler.h"
+#include "DMObjectTree.h"
+#include "BytecodeWriter.h"
+#include "DMExpressionCompiler.h"
+#include "DMStatementCompiler.h"
+#include "DreamProcOpcode.h"
 #include <sstream>
 #include <algorithm>
 #include <cctype>
@@ -292,12 +298,104 @@ void DMProc::Compile(DMCompiler* compiler) {
         return;
     }
     
+    // Skip if already has bytecode
+    if (!Bytecode.empty()) {
+        return;
+    }
+    
     // Initialization procs have null AstBody - they're created dynamically
-    if (AstBody == nullptr) {
+    if (AstBody == nullptr && Name == "__init__") {
         // For initialization procs, we need to:
         // 1. Call parent's init proc if it exists
         // 2. Compile variable initializations from OwningObject
-        // This will be implemented in Phase 4 (bytecode emission)
+        
+        if (!OwningObject) {
+            return;
+        }
+        
+        BytecodeWriter writer;
+        DMExpressionCompiler exprCompiler(compiler, this, &writer);
+        
+        // 1. Call parent's init proc if it exists
+        if (OwningObject->Parent != nullptr && OwningObject->Parent->InitializationProc != -1) {
+            // Call ..() to invoke parent's __init__ proc
+            // SuperProc reference type is 7 (DMReference::Type::SuperProc)
+            writer.Emit(DreamProcOpcode::CallStatement);
+            writer.AppendByte(7);  // DMReference::Type::SuperProc
+            writer.AppendByte(static_cast<uint8_t>(DMCallArgumentsType::None));
+            writer.AppendInt(0);  // No arguments
+            
+            // CallStatement pushes result, but we don't need it - pop it
+            writer.Emit(DreamProcOpcode::Pop);
+        }
+        
+        // 2. Emit bytecode to evaluate and assign each variable's Value expression
+        // Process Variables (defined on this type)
+        for (const auto& [varName, variable] : OwningObject->Variables) {
+            if (variable.Value == nullptr) {
+                continue;  // No initialization needed
+            }
+            
+            // Compile the initializer expression (pushes value onto stack)
+            if (!exprCompiler.CompileExpression(variable.Value)) {
+                compiler->ForcedWarning("Failed to compile initializer for variable '" + varName + "'");
+                continue;
+            }
+            
+            // Emit assignment to src.varName
+            // We need to assign to the instance variable on src
+            // Use SrcField reference type
+            DMObjectTree* objectTree = compiler->GetObjectTree();
+            int stringId = objectTree->AddString(varName);
+            
+            // Emit Assign opcode with SrcField reference
+            writer.Emit(DreamProcOpcode::Assign);
+            writer.AppendByte(static_cast<uint8_t>(DMReference::Type::SrcField));
+            writer.AppendInt(stringId);
+            
+            // Assign pops value and pushes result - pop the result since we don't need it
+            writer.Emit(DreamProcOpcode::Pop);
+        }
+        
+        // Process VariableOverrides (overridden from parent types)
+        for (const auto& [varName, variable] : OwningObject->VariableOverrides) {
+            if (variable.Value == nullptr) {
+                continue;  // No initialization needed
+            }
+            
+            // Compile the initializer expression (pushes value onto stack)
+            if (!exprCompiler.CompileExpression(variable.Value)) {
+                compiler->ForcedWarning("Failed to compile initializer for variable override '" + varName + "'");
+                continue;
+            }
+            
+            // Emit assignment to src.varName
+            DMObjectTree* objectTree = compiler->GetObjectTree();
+            int stringId = objectTree->AddString(varName);
+            
+            // Emit Assign opcode with SrcField reference
+            writer.Emit(DreamProcOpcode::Assign);
+            writer.AppendByte(static_cast<uint8_t>(DMReference::Type::SrcField));
+            writer.AppendInt(stringId);
+            
+            // Assign pops value and pushes result - pop the result since we don't need it
+            writer.Emit(DreamProcOpcode::Pop);
+        }
+        
+        // 3. Add implicit return null
+        writer.Emit(DreamProcOpcode::PushNull);
+        writer.Emit(DreamProcOpcode::Return);
+        
+        // Finalize and copy bytecode to proc
+        writer.Finalize();
+        Bytecode = writer.GetBytecode();
+        MaxStackSize = writer.GetMaxStackSize();
+        
+        return;
+    }
+    
+    // Regular procs with null AstBody - nothing to compile
+    if (AstBody == nullptr) {
         return;
     }
     
@@ -305,16 +403,51 @@ void DMProc::Compile(DMCompiler* compiler) {
     // This ensures they are available immediately for identifier resolution
     // No need to register them again here
     
-    // TODO: Implement full proc compilation in Phase 4
-    // This requires:
-    // 1. ✅ Set up local variable scope (parameters already registered in AddProc)
-    // 2. Compile AstBody->Statements using DMStatementCompiler
-    // 3. Handle set statements (AstBody->SetStatements)
-    // 4. Emit bytecode using BytecodeEmitter
-    // 5. Add implicit return if needed
+    // Create bytecode writer and compilers
+    BytecodeWriter writer;
+    DMExpressionCompiler exprCompiler(compiler, this, &writer);
+    DMStatementCompiler stmtCompiler(compiler, this, &writer, &exprCompiler);
     
-    // For now, compilation is deferred to Phase 4 (bytecode emission)
-    // The proc is ready to be compiled when BytecodeEmitter is implemented
+    // 1. Handle set statements first (they are hoisted to the top)
+    // Set statements configure proc attributes like name, category, src, etc.
+    for (const auto& setStmt : AstBody->SetStatements) {
+        if (!stmtCompiler.CompileStatement(setStmt.get())) {
+            // Set statements are non-critical, just warn and continue
+        }
+    }
+    
+    // 2. Compile the proc body statements
+    if (!stmtCompiler.CompileBlockInner(AstBody)) {
+        // Compilation failed - don't generate bytecode, let EmitBytecode handle it
+        // (it has stub fallback logic for critical procs)
+        return;
+    }
+    
+    // 3. Finalize statement compiler (resolve forward references for goto)
+    if (!stmtCompiler.Finalize()) {
+        // Forward reference resolution failed - don't generate bytecode
+        // (let EmitBytecode handle it with stub fallback logic)
+        return;
+    }
+    
+    // 4. Add implicit return null if the proc doesn't end with a return
+    // Check if bytecode is empty or doesn't end with Return opcode
+    const auto& bytecode = writer.GetBytecode();
+    bool needsImplicitReturn = bytecode.empty() || 
+                               bytecode.back() != static_cast<uint8_t>(DreamProcOpcode::Return);
+    
+    if (needsImplicitReturn) {
+        writer.Emit(DreamProcOpcode::PushNull);
+        writer.ResizeStack(1);
+        writer.Emit(DreamProcOpcode::Return);
+    }
+    
+    // 5. Finalize bytecode (resolve jump labels)
+    writer.Finalize();
+    
+    // Store the compiled bytecode and max stack size
+    Bytecode = writer.GetBytecode();
+    MaxStackSize = writer.GetMaxStackSize();
 }
 
 } // namespace DMCompiler

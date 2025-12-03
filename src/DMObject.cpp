@@ -150,11 +150,6 @@ void DMObject::CreateInitializationProc(DMCompiler* compiler, DMObjectTree* obje
     // For now, we just mark that one is needed - actual compilation happens in DMProc::Compile
     DMProc* initProc = objectTree->CreateProc("__init__", this, false, Location());
     InitializationProc = initProc->Id;
-    
-    // TODO: In Phase 4 (bytecode emission), we'll need to:
-    // 1. Call parent's init proc if it exists
-    // 2. Emit bytecode to evaluate each variable's Value expression
-    // 3. Emit bytecode to assign the result to the variable
 }
 
 } // namespace DMCompiler
