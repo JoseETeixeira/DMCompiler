@@ -77,6 +77,7 @@ private:
     bool CompileWhile(DMASTProcStatementWhile* stmt);
     bool CompileDoWhile(DMASTProcStatementDoWhile* stmt);
     bool CompileFor(DMASTProcStatementFor* stmt);
+    bool CompileForRange(DMASTProcStatementForRange* stmt);
     bool CompileForIn(DMASTProcStatementForIn* stmt);
     bool CompileSwitch(DMASTProcStatementSwitch* stmt);
     bool CompileBreak(DMASTProcStatementBreak* stmt);

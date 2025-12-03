@@ -8,7 +8,15 @@
 namespace DMCompiler {
 
 DMExpressionCompiler::DMExpressionCompiler(DMCompiler* compiler, DMProc* proc, BytecodeWriter* writer)
-    : Compiler_(compiler), Proc_(proc), Writer_(writer) {
+    : Compiler_(compiler), Proc_(proc), Writer_(writer), ExpectedType_(std::nullopt) {
+}
+
+void DMExpressionCompiler::SetExpectedType(std::optional<DreamPath> type) {
+    ExpectedType_ = type;
+}
+
+std::optional<DreamPath> DMExpressionCompiler::GetExpectedType() const {
+    return ExpectedType_;
 }
 
 bool DMExpressionCompiler::CompileExpression(DMASTExpression* expr) {
@@ -64,6 +72,9 @@ bool DMExpressionCompiler::CompileExpression(DMASTExpression* expr) {
     }
     else if (auto* newPath = dynamic_cast<DMASTNewPath*>(expr)) {
         return CompileNewPath(newPath);
+    }
+    else if (auto* stringFormat = dynamic_cast<DMASTStringFormat*>(expr)) {
+        return CompileStringFormat(stringFormat);
     }
     
     // Unsupported expression type
@@ -432,7 +443,22 @@ DreamProcOpcode DMExpressionCompiler::GetBinaryOpcode(BinaryOperator op) {
         case BinaryOperator::In:
             return DreamProcOpcode::IsInList;
             
+        case BinaryOperator::Equivalent:
+            return DreamProcOpcode::CompareEquivalent;
+        case BinaryOperator::NotEquivalent:
+            return DreamProcOpcode::CompareNotEquivalent;
+            
+        case BinaryOperator::Append:
+            return DreamProcOpcode::Append;
+        case BinaryOperator::Remove:
+            return DreamProcOpcode::Remove;
+        case BinaryOperator::Combine:
+            return DreamProcOpcode::Combine;
+        case BinaryOperator::Mask:
+            return DreamProcOpcode::Mask;
+            
         default:
+            std::cerr << "DEBUG: Unsupported binary operator: " << (int)op << std::endl;
             return DreamProcOpcode::Error;
     }
 }
@@ -966,7 +992,13 @@ bool DMExpressionCompiler::CompileAssign(DMASTAssign* expr) {
                     return false;
                 }
             }
-            if (!CompileExpression(expr->Value.get())) return false;
+            // Set expected type for bare 'new' inference (untyped var has no type)
+            SetExpectedType(localVar->Type);
+            if (!CompileExpression(expr->Value.get())) {
+                SetExpectedType(std::nullopt);
+                return false;
+            }
+            SetExpectedType(std::nullopt);
             std::vector<uint8_t> refBytes = { 9, static_cast<uint8_t>(localVar->Id) };
             Writer_->EmitMulti(DreamProcOpcode::Assign, refBytes);
             return true;
@@ -983,8 +1015,8 @@ bool DMExpressionCompiler::CompileAssign(DMASTAssign* expr) {
         const auto& elements = pathExpr->Path.Path.GetElements();
         if (!elements.empty() && elements[0] == "var") {
             LocalVariable* localVar = Proc_->GetLocalVariable(varName);
+            std::optional<DreamPath> typePath;
             if (!localVar) {
-                std::optional<DreamPath> typePath;
                 if (elements.size() > 2) {
                     std::vector<std::string> typeElements(elements.begin() + 1, elements.end() - 1);
                     typePath = DreamPath(DreamPath::PathType::Absolute, typeElements);
@@ -994,8 +1026,16 @@ bool DMExpressionCompiler::CompileAssign(DMASTAssign* expr) {
                     Compiler_->ForcedError(expr->Location_, "Failed to create variable '" + varName + "'");
                     return false;
                 }
+            } else {
+                typePath = localVar->Type;
             }
-            if (!CompileExpression(expr->Value.get())) return false;
+            // Set expected type for bare 'new' inference
+            SetExpectedType(typePath);
+            if (!CompileExpression(expr->Value.get())) {
+                SetExpectedType(std::nullopt);
+                return false;
+            }
+            SetExpectedType(std::nullopt);
             std::vector<uint8_t> refBytes = { 9, static_cast<uint8_t>(localVar->Id) };
             Writer_->EmitMulti(DreamProcOpcode::Assign, refBytes);
             return true;
@@ -1015,18 +1055,31 @@ bool DMExpressionCompiler::CompileAssign(DMASTAssign* expr) {
         // We continue compilation but emit the error
     }
 
+    // Set expected type for bare 'new' inference before compiling the value
+    SetExpectedType(info.ResolvedType);
+
+    bool result = false;
     switch (info.Type) {
         case LValueInfo::Kind::Local:
-            return CompileLocalAssignment(info, expr->Value.get(), expr->Operator);
+            result = CompileLocalAssignment(info, expr->Value.get(), expr->Operator);
+            break;
         case LValueInfo::Kind::Global:
-            return CompileGlobalAssignment(info, expr->Value.get(), expr->Operator);
+            result = CompileGlobalAssignment(info, expr->Value.get(), expr->Operator);
+            break;
         case LValueInfo::Kind::Field:
-            return CompileFieldAssignment(info, expr->Value.get(), expr->Operator, expr->LValue.get());
+            result = CompileFieldAssignment(info, expr->Value.get(), expr->Operator, expr->LValue.get());
+            break;
         case LValueInfo::Kind::Index:
-            return CompileIndexAssignment(info, expr->Value.get(), expr->Operator, expr->LValue.get());
+            result = CompileIndexAssignment(info, expr->Value.get(), expr->Operator, expr->LValue.get());
+            break;
         default:
-            return false;
+            result = false;
+            break;
     }
+
+    // Clear expected type after compilation
+    SetExpectedType(std::nullopt);
+    return result;
 }
 
 bool DMExpressionCompiler::CompileLocalAssignment(const LValueInfo& lvalue, DMASTExpression* value, AssignmentOperator op) {
@@ -1204,6 +1257,10 @@ DMExpressionCompiler::LValueInfo DMExpressionCompiler::ResolveLValue(DMASTExpres
             if (dynamic_cast<LocalConstVariable*>(localVar)) {
                 info.IsConst = true;
             }
+            // Extract type for type inference
+            if (localVar->Type) {
+                info.ResolvedType = localVar->Type;
+            }
             return info;
         }
         
@@ -1215,6 +1272,10 @@ DMExpressionCompiler::LValueInfo DMExpressionCompiler::ResolveLValue(DMASTExpres
                 info.Type = LValueInfo::Kind::Field;
                 info.NeedsStackTarget = false; // Implicit src
                 info.IsConst = field->IsConst;
+                // Extract type for type inference
+                if (field->Type) {
+                    info.ResolvedType = field->Type;
+                }
                 info.ReferenceBytes = { 11 }; // SrcField
                 info.ReferenceBytes.push_back(stringId & 0xFF);
                 info.ReferenceBytes.push_back((stringId >> 8) & 0xFF);
@@ -1229,6 +1290,10 @@ DMExpressionCompiler::LValueInfo DMExpressionCompiler::ResolveLValue(DMASTExpres
         if (globalId != -1) {
             info.Type = LValueInfo::Kind::Global;
             info.IsConst = Compiler_->GetObjectTree()->Globals[globalId].IsConst;
+            // Extract type for type inference
+            if (Compiler_->GetObjectTree()->Globals[globalId].Type) {
+                info.ResolvedType = Compiler_->GetObjectTree()->Globals[globalId].Type;
+            }
             info.ReferenceBytes = { 10 };
             info.ReferenceBytes.push_back(globalId & 0xFF);
             info.ReferenceBytes.push_back((globalId >> 8) & 0xFF);
@@ -1266,6 +1331,20 @@ DMExpressionCompiler::LValueInfo DMExpressionCompiler::ResolveLValue(DMASTExpres
             info.ReferenceBytes.push_back((stringId >> 8) & 0xFF);
             info.ReferenceBytes.push_back((stringId >> 16) & 0xFF);
             info.ReferenceBytes.push_back((stringId >> 24) & 0xFF);
+            
+            // Attempt to resolve the base expression's type for type inference
+            auto baseType = ResolveExpressionType(deref->Expression.get());
+            if (baseType) {
+                // Look up the field on that type
+                DMObject* baseObj = Compiler_->GetObjectTree()->GetType(*baseType);
+                if (baseObj) {
+                    const DMVariable* field = baseObj->GetVariable(propIdent->Identifier);
+                    if (field && field->Type) {
+                        info.ResolvedType = field->Type;
+                    }
+                }
+            }
+            
             return info;
         }
         else {
@@ -1293,7 +1372,20 @@ bool DMExpressionCompiler::CompileIncrementDecrement(DMASTExpressionUnary* expr)
     // Resolve LValue
     LValueInfo info = ResolveLValue(expr->Expression.get());
     if (info.Type == LValueInfo::Kind::Invalid) {
-        std::cerr << "Error: Invalid LValue for increment/decrement" << std::endl;
+        std::cerr << "Error: Invalid LValue for increment/decrement at " 
+                  << expr->Location_.ToString() << std::endl;
+        // Debug: Print the expression type
+        if (auto* ident = dynamic_cast<DMASTIdentifier*>(expr->Expression.get())) {
+            std::cerr << "  Expression is identifier: " << ident->Identifier << std::endl;
+        } else if (dynamic_cast<DMASTDereference*>(expr->Expression.get())) {
+            std::cerr << "  Expression is dereference" << std::endl;
+        } else if (dynamic_cast<DMASTConstantPath*>(expr->Expression.get())) {
+            std::cerr << "  Expression is constant path" << std::endl;
+        } else if (expr->Expression.get()) {
+            std::cerr << "  Expression type: " << typeid(*expr->Expression.get()).name() << std::endl;
+        } else {
+            std::cerr << "  Expression is NULL" << std::endl;
+        }
         return false;
     }
 
@@ -1358,9 +1450,66 @@ bool DMExpressionCompiler::CompileIncrementDecrement(DMASTExpressionUnary* expr)
 }
 
 bool DMExpressionCompiler::CompileNewPath(DMASTNewPath* expr) {
-    if (!expr || !expr->Path) {
+    if (!expr) {
         std::cerr << "Error: Invalid new expression" << std::endl;
         return false;
+    }
+    
+    // Handle bare "new" without explicit type
+    // In DM, this means use the variable's declared type (inferred from context)
+    if (!expr->Path) {
+        // Check if we have an expected type from the assignment/declaration context
+        if (ExpectedType_) {
+            // Use the inferred type - push it as a path constant
+            // We need to ensure we use an absolute path format for type lookup
+            // Relative paths like "list" from "var/list/X" need to become "/list"
+            std::string typePath;
+            if (ExpectedType_->GetPathType() == DreamPath::PathType::Relative) {
+                // Convert relative path to absolute format
+                typePath = "/";
+                const auto& elements = ExpectedType_->GetElements();
+                for (size_t i = 0; i < elements.size(); ++i) {
+                    if (i > 0) typePath += "/";
+                    typePath += elements[i];
+                }
+            } else {
+                typePath = ExpectedType_->ToString();
+            }
+            int typeId = Compiler_->GetObjectTree()->AddString(typePath);
+            Writer_->EmitInt(DreamProcOpcode::PushType, typeId);
+            Writer_->ResizeStack(1);
+            
+            // Compile arguments and push them onto the stack
+            int argCount = 0;
+            for (const auto& param : expr->Parameters) {
+                if (!CompileExpression(param->Value.get())) {
+                    return false;
+                }
+                argCount++;
+            }
+            
+            // Determine argument type
+            DMCallArgumentsType argType = (argCount == 0) ? DMCallArgumentsType::None : DMCallArgumentsType::FromStack;
+            
+            // Emit CreateObject opcode with argument type and stack size
+            std::vector<uint8_t> operands;
+            operands.push_back(static_cast<uint8_t>(argType));
+            operands.push_back(static_cast<uint8_t>(argCount));
+            Writer_->EmitMulti(DreamProcOpcode::CreateObject, operands);
+            
+            // CreateObject pops args + type, pushes result.
+            // Stack change: -argCount - 1 + 1 = -argCount.
+            Writer_->ResizeStack(-argCount);
+            
+            return true;
+        } else {
+            // No expected type available - emit warning and push null
+            std::cerr << "Warning: " << expr->Location_.ToString() << ": Bare 'new' without type and no type can be inferred from context" << std::endl;
+            // Emit a placeholder null value
+            Writer_->Emit(DreamProcOpcode::PushNull);
+            Writer_->ResizeStack(1);
+            return true;
+        }
     }
     
     // Compile the type expression (pushes type/path onto stack)
@@ -1796,6 +1945,100 @@ bool DMExpressionCompiler::CompileSqrt(DMASTCall* expr) {
     // Sqrt pops 1 value, pushes 1 (result), net 0
     
     return true;
+}
+
+bool DMExpressionCompiler::CompileStringFormat(DMASTStringFormat* expr) {
+    // Construct the format string
+    std::string formatStr = "";
+    for (size_t i = 0; i < expr->Expressions.size(); ++i) {
+        formatStr += expr->StringParts[i];
+        formatStr += "[]";
+    }
+    if (!expr->StringParts.empty()) {
+        formatStr += expr->StringParts.back();
+    }
+
+    // Compile all expressions (arguments for the format string)
+    for (const auto& expression : expr->Expressions) {
+        if (!CompileExpression(expression.get())) {
+            return false;
+        }
+    }
+
+    // Emit FormatString opcode
+    // Takes the format string as a string operand
+    // Takes the number of arguments as an integer operand
+    Writer_->EmitString(DreamProcOpcode::FormatString, formatStr);
+    Writer_->AppendInt(static_cast<int32_t>(expr->Expressions.size()));
+
+    // FormatString pops N arguments and pushes 1 result string
+    // Net stack change: 1 - N
+    Writer_->ResizeStack(1 - static_cast<int>(expr->Expressions.size()));
+
+    return true;
+}
+
+std::optional<DreamPath> DMExpressionCompiler::ResolveExpressionType(DMASTExpression* expr) {
+    if (!expr) return std::nullopt;
+    
+    // Handle identifier (local var, field, global)
+    if (auto* ident = dynamic_cast<DMASTIdentifier*>(expr)) {
+        // Check local variable
+        if (LocalVariable* var = Proc_->GetLocalVariable(ident->Identifier)) {
+            return var->Type;
+        }
+        
+        // Check field on owning object
+        if (Proc_->OwningObject) {
+            if (const DMVariable* field = Proc_->OwningObject->GetVariable(ident->Identifier)) {
+                return field->Type;
+            }
+        }
+        
+        // Check global variable
+        int globalId = Compiler_->GetObjectTree()->GetGlobalVariableId(ident->Identifier);
+        if (globalId != -1) {
+            return Compiler_->GetObjectTree()->Globals[globalId].Type;
+        }
+        
+        return std::nullopt;
+    }
+    
+    // Handle dereference (obj.field)
+    if (auto* deref = dynamic_cast<DMASTDereference*>(expr)) {
+        // Cannot infer type of indexing result (e.g., list[index])
+        if (deref->Type == DereferenceType::Index) {
+            return std::nullopt;
+        }
+        
+        // Property must be an identifier for field access
+        auto* propIdent = dynamic_cast<DMASTIdentifier*>(deref->Property.get());
+        if (!propIdent) return std::nullopt;
+        
+        // Recursively resolve base expression type
+        auto baseType = ResolveExpressionType(deref->Expression.get());
+        if (!baseType) return std::nullopt;
+        
+        // Look up base type in object tree
+        DMObject* baseObj = Compiler_->GetObjectTree()->GetType(*baseType);
+        if (!baseObj) return std::nullopt;
+        
+        // Look up field on base type
+        const DMVariable* field = baseObj->GetVariable(propIdent->Identifier);
+        if (field) {
+            return field->Type;
+        }
+        
+        return std::nullopt;
+    }
+    
+    // Handle constant path (e.g., /mob/player)
+    if (auto* path = dynamic_cast<DMASTConstantPath*>(expr)) {
+        return path->Path.Path;
+    }
+    
+    // Other expression types - cannot determine type statically
+    return std::nullopt;
 }
 
 } // namespace DMCompiler

@@ -124,6 +124,8 @@ bool DMStatementCompiler::CompileStatement(DMASTProcStatement* statement) {
         return CompileDoWhile(doWhileStmt);
     } else if (auto* forStmt = dynamic_cast<DMASTProcStatementFor*>(statement)) {
         return CompileFor(forStmt);
+    } else if (auto* forRangeStmt = dynamic_cast<DMASTProcStatementForRange*>(statement)) {
+        return CompileForRange(forRangeStmt);
     } else if (auto* forInStmt = dynamic_cast<DMASTProcStatementForIn*>(statement)) {
         return CompileForIn(forInStmt);
     } else if (auto* switchStmt = dynamic_cast<DMASTProcStatementSwitch*>(statement)) {
@@ -491,6 +493,112 @@ bool DMStatementCompiler::CompileFor(DMASTProcStatementFor* stmt) {
     return true;
 }
 
+bool DMStatementCompiler::CompileForRange(DMASTProcStatementForRange* stmt) {
+    // for (var/x = start to end step step) { body }
+    // Equivalent to:
+    //   var/x = start
+    // start_label:
+    //   if (x > end) goto end_label  (or x < end if step is negative, but we use simple <=)
+    //   <body>
+    // continue_label:
+    //   x += step (or x++ if step is null)
+    //   goto start_label
+    // end_label:
+    
+    // The initializer should be an assignment like var/x = start or just x = start
+    // We need to extract the variable to generate comparison and increment
+    
+    // Compile the initializer expression (which should be a var declaration with assignment)
+    if (stmt->Initializer) {
+        if (!ExprCompiler_->CompileExpression(stmt->Initializer.get())) {
+            return false;
+        }
+        // Pop the result of the initializer (we only care about side effects)
+        Writer_->Emit(DreamProcOpcode::Pop);
+        Writer_->ResizeStack(-1);
+    }
+    
+    std::string startLabel = NewLabel();
+    std::string continueLabel = NewLabel();
+    std::string endLabel = NewLabel();
+    
+    // Push loop context for break/continue
+    PushLoopContext(startLabel, endLabel, continueLabel);
+    
+    EmitLabel(startLabel);
+    
+    // Extract variable expression from initializer to generate the comparison
+    // The initializer should be DMASTAssign
+    DMASTExpression* varExpr = nullptr;
+    
+    if (auto* assign = dynamic_cast<DMASTAssign*>(stmt->Initializer.get())) {
+        varExpr = assign->LValue.get();
+    }
+    
+    if (varExpr) {
+        // Generate: variable <= end
+        if (!ExprCompiler_->CompileExpression(varExpr)) {
+            PopLoopContext();
+            return false;
+        }
+        if (!ExprCompiler_->CompileExpression(stmt->End.get())) {
+            PopLoopContext();
+            return false;
+        }
+        Writer_->Emit(DreamProcOpcode::CompareLessThanOrEqual);
+        Writer_->ResizeStack(-1);  // Pops two, pushes one
+        
+        EmitJumpIfFalse(endLabel);
+        Writer_->ResizeStack(-1);  // JumpIfFalse pops the condition
+    }
+    
+    // Compile body
+    if (!CompileBlockInner(stmt->Body.get())) {
+        PopLoopContext();
+        return false;
+    }
+    
+    EmitLabel(continueLabel);
+    
+    // Compile increment: var += step (or var += 1 if no step)
+    if (varExpr) {
+        // Resolve the variable as an LValue
+        auto lvalueInfo = ExprCompiler_->ResolveLValue(varExpr);
+        if (lvalueInfo.Type == DMExpressionCompiler::LValueInfo::Kind::Invalid) {
+            Compiler_->ForcedWarning("Invalid loop variable in for-range at " + stmt->Location_.ToString());
+            PopLoopContext();
+            return false;
+        }
+        
+        // Compile step (or 1 if null)
+        if (stmt->Step) {
+            if (!ExprCompiler_->CompileExpression(stmt->Step.get())) {
+                PopLoopContext();
+                return false;
+            }
+        } else {
+            // Default step is 1
+            Writer_->EmitFloat(DreamProcOpcode::PushFloat, 1.0f);
+            Writer_->ResizeStack(1);
+        }
+        
+        // Use Append opcode (+=) with the variable reference
+        Writer_->EmitMulti(DreamProcOpcode::Append, lvalueInfo.ReferenceBytes);
+        
+        // Pop the result of the append
+        Writer_->Emit(DreamProcOpcode::Pop);
+        Writer_->ResizeStack(-1);
+    }
+    
+    EmitJump(startLabel);
+    
+    EmitLabel(endLabel);
+    
+    PopLoopContext();
+    
+    return true;
+}
+
 bool DMStatementCompiler::CompileBreak(DMASTProcStatementBreak* stmt) {
     LoopContext* loop = GetCurrentLoop();
     if (!loop) {
@@ -545,42 +653,58 @@ bool DMStatementCompiler::CompileForIn(DMASTProcStatementForIn* stmt) {
     // 6. Jump to start
     // 7. End loop and destroy enumerator
     
-    // Step 1: Compile the list expression (pushes list onto stack)
-    if (!ExprCompiler_->CompileExpression(stmt->List.get())) {
-        return false;
-    }
-    
-    // Step 2: Create list enumerator (possibly filtered by type)
     int enumeratorId = Proc_->GetNextEnumeratorId();
     
-    // Check if we have a type filter from the variable declaration
-    if (stmt->VarDecl.TypePath.has_value()) {
-        // Use filtered enumerator with type path
-        DreamPath filterPath = stmt->VarDecl.TypePath.value();
-        std::string filterPathStr = filterPath.ToString();
+    // Check for range expression (start to end)
+    auto* binOp = dynamic_cast<DMASTExpressionBinary*>(stmt->List.get());
+    if (binOp && binOp->Operator == BinaryOperator::To) {
+        // Range loop: for(x in 1 to 10)
+        if (!ExprCompiler_->CompileExpression(binOp->Left.get())) return false;
+        if (!ExprCompiler_->CompileExpression(binOp->Right.get())) return false;
         
-        // Look up the type ID for the filter path
-        DMObjectTree* objectTree = Compiler_->GetObjectTree();
-        int filterTypeId = -1;
-        if (objectTree) {
-            int typeId;
-            if (objectTree->TryGetTypeId(filterPath, typeId)) {
-                filterTypeId = typeId;
-            }
+        // Step is 1 by default. 
+        Writer_->EmitFloat(DreamProcOpcode::PushFloat, 1.0f);
+        Writer_->ResizeStack(1);
+        
+        // Create range enumerator (pops start, end, step)
+        Writer_->EmitInt(DreamProcOpcode::CreateRangeEnumerator, enumeratorId);
+        Writer_->ResizeStack(-3);
+    } else {
+        // Step 1: Compile the list expression (pushes list onto stack)
+        if (!ExprCompiler_->CompileExpression(stmt->List.get())) {
+            return false;
         }
         
-        // If type exists, use filtered enumerator; otherwise fall back to regular enumerator
-        if (filterTypeId >= 0) {
-            Writer_->CreateFilteredListEnumerator(enumeratorId, filterTypeId, filterPathStr);
+        // Step 2: Create list enumerator (possibly filtered by type)
+        // Check if we have a type filter from the variable declaration
+        if (stmt->VarDecl.TypePath.has_value()) {
+            // Use filtered enumerator with type path
+            DreamPath filterPath = stmt->VarDecl.TypePath.value();
+            std::string filterPathStr = filterPath.ToString();
+            
+            // Look up the type ID for the filter path
+            DMObjectTree* objectTree = Compiler_->GetObjectTree();
+            int filterTypeId = -1;
+            if (objectTree) {
+                int typeId;
+                if (objectTree->TryGetTypeId(filterPath, typeId)) {
+                    filterTypeId = typeId;
+                }
+            }
+            
+            // If type exists, use filtered enumerator; otherwise fall back to regular enumerator
+            if (filterTypeId >= 0) {
+                Writer_->CreateFilteredListEnumerator(enumeratorId, filterTypeId, filterPathStr);
+            } else {
+                // Type not found, use regular enumerator (let runtime handle filtering)
+                Writer_->CreateListEnumerator(enumeratorId);
+            }
         } else {
-            // Type not found, use regular enumerator (let runtime handle filtering)
+            // No type filter - use regular list enumerator
             Writer_->CreateListEnumerator(enumeratorId);
         }
-    } else {
-        // No type filter - use regular list enumerator
-        Writer_->CreateListEnumerator(enumeratorId);
+        Writer_->ResizeStack(-1);  // CreateListEnumerator/CreateFilteredListEnumerator pops the list
     }
-    Writer_->ResizeStack(-1);  // CreateListEnumerator/CreateFilteredListEnumerator pops the list
     
     // Step 3: Create labels for the loop
     std::string loopLabel = NewLabel();
@@ -915,18 +1039,25 @@ bool DMStatementCompiler::CompileVarDeclaration(DMASTProcStatementVarDeclaration
             return false;
         }
         
+        // Determine the type path for this variable
+        // If IsList is true (var/X[]), the type is /list even if not explicitly specified
+        std::optional<DreamPath> effectiveTypePath = decl.TypePath;
+        if (!effectiveTypePath && decl.IsList) {
+            effectiveTypePath = DreamPath("/list");
+        }
+        
         // Check if the variable already exists
         LocalVariable* var = Proc_->GetLocalVariable(varName);
         if (var) {
             // Variable already exists - check if we need to update type info
             // In DM, redeclaring a variable is allowed and often used to refine the type
-            if (decl.TypePath && !var->Type) {
-                var->Type = decl.TypePath;
+            if (effectiveTypePath && !var->Type) {
+                var->Type = effectiveTypePath;
             }
             // Do NOT warn about redeclaration - it's valid DM behavior
         } else {
             // Add the variable to the proc's local variables
-            var = Proc_->AddLocalVariable(varName, decl.TypePath);
+            var = Proc_->AddLocalVariable(varName, effectiveTypePath);
             if (!var) {
                 std::string contextMsg = "Failed to create variable '" + varName + "' at " + stmt->Location_.ToString();
                 if (Proc_ && Proc_->OwningObject) {
@@ -939,10 +1070,17 @@ bool DMStatementCompiler::CompileVarDeclaration(DMASTProcStatementVarDeclaration
         
         // If there's an initialization value, compile and assign it
         if (decl.Value) {
+            // Set expected type for bare 'new' inference
+            ExprCompiler_->SetExpectedType(effectiveTypePath);
+            
             // Compile the value expression (pushes value onto stack)
             if (!ExprCompiler_->CompileExpression(decl.Value.get())) {
+                ExprCompiler_->SetExpectedType(std::nullopt);
                 return false;
             }
+            
+            // Clear expected type after compilation
+            ExprCompiler_->SetExpectedType(std::nullopt);
             
             // Emit Assign opcode followed by the reference to the local variable
             Writer_->Emit(DreamProcOpcode::Assign);

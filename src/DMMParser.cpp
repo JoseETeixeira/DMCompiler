@@ -6,6 +6,7 @@
 #include "DreamPath.h"
 #include <sstream>
 #include <algorithm>
+#include <iostream>
 
 namespace DMCompiler {
 
@@ -21,7 +22,9 @@ std::unique_ptr<DreamMapJson> DMMParser::ParseMap() {
     bool parsing = true;
     while (parsing) {
         auto cellDefinition = ParseCellDefinition();
+        bool foundCell = false;
         if (cellDefinition) {
+            foundCell = true;
             if (CellNameLength_ == -1) {
                 CellNameLength_ = static_cast<int>(cellDefinition->Name.length());
             }
@@ -34,7 +37,9 @@ std::unique_ptr<DreamMapJson> DMMParser::ParseMap() {
         }
         
         auto mapBlock = ParseMapBlock();
+        bool foundBlock = false;
         if (mapBlock) {
+            foundBlock = true;
             int maxX = mapBlock->X + mapBlock->Width - 1;
             int maxY = mapBlock->Y + mapBlock->Height - 1;
             if (map->MaxX < maxX) map->MaxX = maxX;
@@ -44,7 +49,7 @@ std::unique_ptr<DreamMapJson> DMMParser::ParseMap() {
             map->Blocks.push_back(std::move(mapBlock));
         }
         
-        if (!cellDefinition && !mapBlock) {
+        if (!foundCell && !foundBlock) {
             parsing = false;
         }
     }
@@ -63,11 +68,13 @@ std::unique_ptr<CellDefinitionJson> DMMParser::ParseCellDefinition() {
     
     Token currentToken = Current();
     
-    if (Check(TokenType::String)) {
+    if (Check(TokenType::String) || Check(TokenType::Identifier)) {
+        Advance(); // Consume the string
         Consume(TokenType::Assign, "Expected '='");
         Consume(TokenType::LeftParenthesis, "Expected '('");
         
-        auto cellDefinition = std::make_unique<CellDefinitionJson>(currentToken.Value.StringValue);
+        std::string cellName = (currentToken.Type == TokenType::String) ? currentToken.Value.StringValue : currentToken.Text;
+        auto cellDefinition = std::make_unique<CellDefinitionJson>(cellName);
         
         auto objectType = PathExpression();
         while (objectType) {
@@ -82,17 +89,37 @@ std::unique_ptr<CellDefinitionJson> DMMParser::ParseCellDefinition() {
             
             // Check for variable overrides
             if (Check(TokenType::LeftCurlyBracket)) {
-                auto statement = Statement();
+                Advance(); // Consume {
                 
-                while (statement) {
-                    // For now, we'll simplify and not fully implement var override parsing
-                    // This would require expression building which is complex
-                    // Just skip to the end of the block
+                while (!Check(TokenType::RightCurlyBracket) && !Check(TokenType::EndOfFile)) {
+                    // Skip newlines
+                    while (Current().Type == TokenType::Newline) Advance();
                     
-                    if (Check(TokenType::Semicolon)) {
-                        statement = Statement();
+                    if (Check(TokenType::Identifier) || Check(TokenType::Var)) {
+                        Advance(); // Consume variable name
+                        
+                        if (Check(TokenType::Assign)) {
+                            Advance(); // Consume =
+                            
+                            // Parse value (constant or path)
+                            auto expr = ConstantExpression();
+                            if (!expr) {
+                                auto path = PathExpression();
+                                if (!path) {
+                                    // Fallback: consume until semicolon or }
+                                    while (!Check(TokenType::Semicolon) && !Check(TokenType::RightCurlyBracket) && !Check(TokenType::EndOfFile)) {
+                                        Advance();
+                                    }
+                                }
+                            }
+                        }
+                    } else if (Check(TokenType::Semicolon)) {
+                        Advance();
                     } else {
-                        statement = nullptr;
+                        // Unexpected token, skip to avoid infinite loop if not }
+                        if (!Check(TokenType::RightCurlyBracket)) {
+                            Advance();
+                        }
                     }
                 }
                 
@@ -111,7 +138,15 @@ std::unique_ptr<CellDefinitionJson> DMMParser::ParseCellDefinition() {
             }
             
             // Check for more objects
+            // Skip whitespace/newlines before checking for comma
+            while (Current().Type == TokenType::Newline || 
+                   Current().Type == TokenType::Indent || 
+                   Current().Type == TokenType::Dedent) {
+                Advance();
+            }
+
             if (Check(TokenType::Comma)) {
+                Advance();
                 objectType = PathExpression();
             } else {
                 objectType = nullptr;
@@ -203,6 +238,8 @@ std::unique_ptr<DMMParser::Coordinates> DMMParser::ParseCoordinates() {
         return nullptr;
     }
     
+    Advance(); // Consume (
+    
     auto xExpr = ConstantExpression();
     auto xConst = dynamic_cast<DMASTConstantInteger*>(xExpr.get());
     if (!xConst) {
@@ -247,7 +284,7 @@ std::unique_ptr<DMASTPath> DMMParser::PathExpression() {
     }
     
     // Check if we have a path starting with /
-    if (Current().Type != TokenType::Slash) {
+    if (Current().Type != TokenType::Slash && Current().Type != TokenType::Divide) {
         return nullptr;
     }
     

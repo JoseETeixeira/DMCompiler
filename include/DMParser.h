@@ -174,12 +174,14 @@ private:
     std::unique_ptr<DMASTExpression> NewExpression();
     std::unique_ptr<DMASTExpression> ListExpression(const Location& loc, bool isAssociative);
     std::unique_ptr<DMASTExpression> NewListExpression(const Location& loc);
+    std::unique_ptr<DMASTExpression> ParseInterpolatedString();  // Strings with [embedded] expressions
     
     // Proc statement parsing (ProcStatement is public for testing)
     std::unique_ptr<DMASTProcStatement> ProcStatementVarDeclaration();
     void ParseVarDeclarations(std::vector<DMASTProcStatementVarDeclaration::Decl>& decls, std::optional<DreamPath>& currentTypePath);
     std::unique_ptr<DMASTProcStatement> ProcStatementReturn();
     std::unique_ptr<DMASTProcStatement> ProcStatementIf();
+    std::unique_ptr<DMASTProcStatement> ProcStatementIfWithBaseIndent(int baseIndent);  // For else-if chains
     std::unique_ptr<DMASTProcStatement> ProcStatementWhile();
     std::unique_ptr<DMASTProcStatement> ProcStatementDoWhile();
     std::unique_ptr<DMASTProcStatement> ProcStatementFor();

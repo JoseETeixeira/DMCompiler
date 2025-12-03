@@ -3371,6 +3371,193 @@ bool TestCompileMultipleNamedArguments() {
     return true;
 }
 
+// ============================================================================
+// ResolveExpressionType Tests
+// ============================================================================
+
+// Test: ResolveExpressionType for local variable with type
+bool TestResolveExpressionTypeLocalVariable() {
+    std::cout << "  TestResolveExpressionTypeLocalVariable... " << std::flush;
+    
+    DMCompiler::BytecodeWriter writer;
+    DMCompiler::DMCompiler compiler;
+    DMCompiler::DMObject testObj(0, DMCompiler::DreamPath("/test"));
+    DMCompiler::DMProc proc(0, "test_proc", &testObj, false, DMCompiler::Location());
+    
+    // Add a typed local variable: var/list/mylist
+    DMCompiler::DreamPath listType("/list");
+    proc.AddLocalVariable("mylist", listType);
+    
+    DMCompiler::DMExpressionCompiler exprCompiler(&compiler, &proc, &writer);
+    
+    // Create identifier expression: mylist
+    auto expr = std::make_unique<DMCompiler::DMASTIdentifier>(DMCompiler::Location(), "mylist");
+    
+    // Resolve type - need to access through public interface
+    // Since ResolveExpressionType is private, we test via ResolveLValue which uses it
+    auto lvalueInfo = exprCompiler.ResolveLValue(expr.get());
+    
+    assert(lvalueInfo.ResolvedType.has_value() && "Should resolve type for typed local variable");
+    assert(lvalueInfo.ResolvedType->ToString() == "/list" && "Type should be /list");
+    
+    std::cout << "PASSED" << std::endl;
+    return true;
+}
+
+// Test: ResolveExpressionType for field on owning object
+bool TestResolveExpressionTypeFieldOnOwner() {
+    std::cout << "  TestResolveExpressionTypeFieldOnOwner... ";
+    
+    DMCompiler::BytecodeWriter writer;
+    DMCompiler::DMCompiler compiler;
+    
+    // Create an object with a typed field
+    DMCompiler::DMObject testObj(0, DMCompiler::DreamPath("/mob"));
+    DMCompiler::DreamPath listType("/list");
+    testObj.Variables["items"] = DMCompiler::DMVariable(listType, "items", false, false, false, false);
+    
+    DMCompiler::DMProc proc(0, "test_proc", &testObj, false, DMCompiler::Location());
+    DMCompiler::DMExpressionCompiler exprCompiler(&compiler, &proc, &writer);
+    
+    // Create identifier expression: items (implicit src.items)
+    auto expr = std::make_unique<DMCompiler::DMASTIdentifier>(DMCompiler::Location(), "items");
+    
+    // Resolve LValue - should pick up type from field on owning object
+    auto lvalueInfo = exprCompiler.ResolveLValue(expr.get());
+    
+    assert(lvalueInfo.ResolvedType.has_value() && "Should resolve type for field on owning object");
+    assert(lvalueInfo.ResolvedType->ToString() == "/list" && "Type should be /list");
+    
+    std::cout << "PASSED" << std::endl;
+    return true;
+}
+
+// Test: ResolveExpressionType for dereference (obj.field)
+bool TestResolveExpressionTypeDereference() {
+    std::cout << "  TestResolveExpressionTypeDereference... ";
+    
+    DMCompiler::BytecodeWriter writer;
+    DMCompiler::DMCompiler compiler;
+    
+    // Create a type /datum/map with a typed field 'atom_sets'
+    auto* mapType = compiler.GetObjectTree()->GetOrCreateDMObject(DMCompiler::DreamPath("/datum/map"));
+    DMCompiler::DreamPath listType("/list");
+    mapType->Variables["atom_sets"] = DMCompiler::DMVariable(listType, "atom_sets", false, false, false, false);
+    
+    // Create owning object and proc
+    DMCompiler::DMObject testObj(1, DMCompiler::DreamPath("/test"));
+    DMCompiler::DMProc proc(0, "test_proc", &testObj, false, DMCompiler::Location());
+    
+    // Add a typed local variable: var/datum/map/map
+    DMCompiler::DreamPath mapPath("/datum/map");
+    proc.AddLocalVariable("map", mapPath);
+    
+    DMCompiler::DMExpressionCompiler exprCompiler(&compiler, &proc, &writer);
+    
+    // Create dereference expression: map.atom_sets
+    auto mapIdent = std::make_unique<DMCompiler::DMASTIdentifier>(DMCompiler::Location(), "map");
+    auto fieldIdent = std::make_unique<DMCompiler::DMASTIdentifier>(DMCompiler::Location(), "atom_sets");
+    auto expr = std::make_unique<DMCompiler::DMASTDereference>(
+        DMCompiler::Location(),
+        std::move(mapIdent),
+        DMCompiler::DereferenceType::Direct,
+        std::move(fieldIdent)
+    );
+    
+    // Resolve LValue - should resolve type through dereference chain
+    auto lvalueInfo = exprCompiler.ResolveLValue(expr.get());
+    
+    assert(lvalueInfo.ResolvedType.has_value() && "Should resolve type for dereference");
+    assert(lvalueInfo.ResolvedType->ToString() == "/list" && "Type should be /list");
+    
+    std::cout << "PASSED" << std::endl;
+    return true;
+}
+
+// Test: ResolveExpressionType for chained dereference (a.b.c)
+bool TestResolveExpressionTypeChainedDereference() {
+    std::cout << "  TestResolveExpressionTypeChainedDereference... ";
+    
+    DMCompiler::BytecodeWriter writer;
+    DMCompiler::DMCompiler compiler;
+    
+    // Create type hierarchy:
+    // /datum/controller has var/datum/target/target
+    // /datum/target has var/list/items
+    auto* targetType = compiler.GetObjectTree()->GetOrCreateDMObject(DMCompiler::DreamPath("/datum/target"));
+    DMCompiler::DreamPath listType("/list");
+    targetType->Variables["items"] = DMCompiler::DMVariable(listType, "items", false, false, false, false);
+    
+    auto* controllerType = compiler.GetObjectTree()->GetOrCreateDMObject(DMCompiler::DreamPath("/datum/controller"));
+    DMCompiler::DreamPath targetPath("/datum/target");
+    controllerType->Variables["target"] = DMCompiler::DMVariable(targetPath, "target", false, false, false, false);
+    
+    // Create owning object and proc
+    DMCompiler::DMObject testObj(2, DMCompiler::DreamPath("/test"));
+    DMCompiler::DMProc proc(0, "test_proc", &testObj, false, DMCompiler::Location());
+    
+    // Add typed local variable: var/datum/controller/ctrl
+    DMCompiler::DreamPath controllerPath("/datum/controller");
+    proc.AddLocalVariable("ctrl", controllerPath);
+    
+    DMCompiler::DMExpressionCompiler exprCompiler(&compiler, &proc, &writer);
+    
+    // Create chained dereference: ctrl.target.items
+    // First: ctrl.target
+    auto ctrlIdent = std::make_unique<DMCompiler::DMASTIdentifier>(DMCompiler::Location(), "ctrl");
+    auto targetIdent = std::make_unique<DMCompiler::DMASTIdentifier>(DMCompiler::Location(), "target");
+    auto firstDeref = std::make_unique<DMCompiler::DMASTDereference>(
+        DMCompiler::Location(),
+        std::move(ctrlIdent),
+        DMCompiler::DereferenceType::Direct,
+        std::move(targetIdent)
+    );
+    
+    // Second: (ctrl.target).items
+    auto itemsIdent = std::make_unique<DMCompiler::DMASTIdentifier>(DMCompiler::Location(), "items");
+    auto expr = std::make_unique<DMCompiler::DMASTDereference>(
+        DMCompiler::Location(),
+        std::move(firstDeref),
+        DMCompiler::DereferenceType::Direct,
+        std::move(itemsIdent)
+    );
+    
+    // Resolve LValue
+    auto lvalueInfo = exprCompiler.ResolveLValue(expr.get());
+    
+    assert(lvalueInfo.ResolvedType.has_value() && "Should resolve type for chained dereference");
+    assert(lvalueInfo.ResolvedType->ToString() == "/list" && "Type should be /list");
+    
+    std::cout << "PASSED" << std::endl;
+    return true;
+}
+
+// Test: ResolveExpressionType returns nullopt for unknown type
+bool TestResolveExpressionTypeUnknown() {
+    std::cout << "  TestResolveExpressionTypeUnknown... ";
+    
+    DMCompiler::BytecodeWriter writer;
+    DMCompiler::DMCompiler compiler;
+    DMCompiler::DMObject testObj(0, DMCompiler::DreamPath("/test"));
+    DMCompiler::DMProc proc(0, "test_proc", &testObj, false, DMCompiler::Location());
+    
+    // Add an UNTYPED local variable
+    proc.AddLocalVariable("unknown_var");  // No type specified
+    
+    DMCompiler::DMExpressionCompiler exprCompiler(&compiler, &proc, &writer);
+    
+    // Create identifier expression: unknown_var
+    auto expr = std::make_unique<DMCompiler::DMASTIdentifier>(DMCompiler::Location(), "unknown_var");
+    
+    // Resolve LValue - should NOT have a resolved type
+    auto lvalueInfo = exprCompiler.ResolveLValue(expr.get());
+    
+    assert(!lvalueInfo.ResolvedType.has_value() && "Should NOT resolve type for untyped variable");
+    
+    std::cout << "PASSED" << std::endl;
+    return true;
+}
+
 int RunExpressionCompilerTests() {
     std::cout << "\n=== Running Expression Compiler Tests ===" << std::endl;
     
@@ -3441,6 +3628,13 @@ int RunExpressionCompilerTests() {
         if (!TestCompilePositionalArgumentsVerifyType()) failures++;
         if (!TestCompileEmptyCallVerifyType()) failures++;
         if (!TestCompileMultipleNamedArguments()) failures++;
+        // ResolveExpressionType Tests
+        std::cout << "  [DEBUG] About to run ResolveExpressionType tests..." << std::endl;
+        if (!TestResolveExpressionTypeLocalVariable()) failures++;
+        if (!TestResolveExpressionTypeFieldOnOwner()) failures++;
+        if (!TestResolveExpressionTypeDereference()) failures++;
+        if (!TestResolveExpressionTypeChainedDereference()) failures++;
+        if (!TestResolveExpressionTypeUnknown()) failures++;
     } catch (const std::exception& e) {
         std::cerr << "Exception during expression compiler tests: " << e.what() << std::endl;
         failures++;

@@ -9,6 +9,8 @@
 #include <optional>
 #include <memory>
 #include <cstdint>
+#include <variant>
+#include <type_traits>
 
 namespace DMCompiler {
 
@@ -96,19 +98,115 @@ public:
 };
 
 /// <summary>
+/// Constant - A type-safe representation of compile-time constant values
+/// Used for const local variables, constant folding, and compile-time evaluation
+/// </summary>
+struct Constant {
+    /// The actual constant value - can be null, integer, float, string, path, or resource
+    std::variant<
+        std::nullptr_t,     // null constant
+        int64_t,            // integer constant
+        double,             // float constant  
+        std::string,        // string constant
+        DreamPath           // path constant (also used for resources as path strings)
+    > Value;
+    
+    /// Default constructor - creates null constant
+    Constant() : Value(nullptr) {}
+    
+    /// Construct from nullptr (null constant)
+    Constant(std::nullptr_t) : Value(nullptr) {}
+    
+    /// Construct from integer (use int64_t to avoid overload issues)
+    explicit Constant(int64_t v) : Value(v) {}
+    
+    /// Construct from float/double
+    explicit Constant(double v) : Value(v) {}
+    explicit Constant(float v) : Value(static_cast<double>(v)) {}
+    
+    /// Construct from string
+    explicit Constant(const std::string& v) : Value(v) {}
+    explicit Constant(std::string&& v) : Value(std::move(v)) {}
+    explicit Constant(const char* v) : Value(std::string(v)) {}
+    
+    /// Construct from path
+    explicit Constant(const DreamPath& v) : Value(v) {}
+    explicit Constant(DreamPath&& v) : Value(std::move(v)) {}
+    
+    /// Helper to create integer constant from any integer type
+    template<typename T, typename = std::enable_if_t<std::is_integral_v<T> && !std::is_same_v<T, int64_t>>>
+    static Constant FromInt(T v) { return Constant(static_cast<int64_t>(v)); }
+    
+    /// Check if this is a null constant
+    bool IsNull() const { return std::holds_alternative<std::nullptr_t>(Value); }
+    
+    /// Check if this is an integer constant
+    bool IsInteger() const { return std::holds_alternative<int64_t>(Value); }
+    
+    /// Check if this is a float constant
+    bool IsFloat() const { return std::holds_alternative<double>(Value); }
+    
+    /// Check if this is a string constant
+    bool IsString() const { return std::holds_alternative<std::string>(Value); }
+    
+    /// Check if this is a path constant
+    bool IsPath() const { return std::holds_alternative<DreamPath>(Value); }
+    
+    /// Check if this is a numeric constant (integer or float)
+    bool IsNumeric() const { return IsInteger() || IsFloat(); }
+    
+    /// Get integer value (throws if not integer)
+    int64_t AsInteger() const { return std::get<int64_t>(Value); }
+    
+    /// Get float value (throws if not float)
+    double AsFloat() const { return std::get<double>(Value); }
+    
+    /// Get string value (throws if not string)
+    const std::string& AsString() const { return std::get<std::string>(Value); }
+    
+    /// Get path value (throws if not path)
+    const DreamPath& AsPath() const { return std::get<DreamPath>(Value); }
+    
+    /// Get numeric value as double (works for both integer and float)
+    double AsNumber() const {
+        if (IsInteger()) return static_cast<double>(AsInteger());
+        if (IsFloat()) return AsFloat();
+        return 0.0;
+    }
+    
+    /// Get a string representation for debugging
+    std::string ToString() const {
+        if (IsNull()) return "null";
+        if (IsInteger()) return std::to_string(AsInteger());
+        if (IsFloat()) return std::to_string(AsFloat());
+        if (IsString()) return "\"" + AsString() + "\"";
+        if (IsPath()) return AsPath().ToString();
+        return "<unknown>";
+    }
+    
+    /// Check equality
+    bool operator==(const Constant& other) const {
+        return Value == other.Value;
+    }
+    
+    bool operator!=(const Constant& other) const {
+        return !(*this == other);
+    }
+};
+
+/// <summary>
 /// LocalConstVariable - A local variable that's const with a known value
 /// </summary>
 class LocalConstVariable : public LocalVariable {
 public:
-    /// The constant value (simplified - will need proper Constant type later)
-    // TODO: Replace with actual Constant type when implementing constant folding
-    void* ConstValue; // Placeholder
+    /// The constant value
+    Constant ConstValue;
     
     LocalConstVariable(
         std::string name,
         int id,
         std::optional<DreamPath> type,
-        void* value
+        Constant value
     );
 };
 
@@ -162,8 +260,9 @@ public:
     /// Global variables accessed by this proc
     std::unordered_map<std::string, int> GlobalVariables;
     
-    /// Bytecode for this proc (raw bytes)
-    /// TODO: Change to proper bytecode buffer type when implementing bytecode emission
+    /// Bytecode for this proc (raw bytes in little-endian format)
+    /// Generated by BytecodeWriter during compilation
+    /// Format: sequence of opcodes (DreamProcOpcode) followed by their operands
     std::vector<uint8_t> Bytecode;
     
     /// Maximum stack size required by this proc
@@ -255,7 +354,7 @@ public:
     LocalConstVariable* AddLocalConst(
         const std::string& name,
         std::optional<DreamPath> type,
-        void* value
+        Constant value
     );
     
     /// Get a local variable by name (includes parameters)

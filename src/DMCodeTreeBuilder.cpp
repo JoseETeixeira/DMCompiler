@@ -63,6 +63,10 @@ void DMCodeTreeBuilder::ProcessStatements(const std::vector<std::unique_ptr<DMAS
 }
 
 void DMCodeTreeBuilder::ProcessStatement(DMASTStatement* statement, const DreamPath& currentType) {
+    ProcessStatementWithVarContext(statement, currentType, std::nullopt);
+}
+
+void DMCodeTreeBuilder::ProcessStatementWithVarContext(DMASTStatement* statement, const DreamPath& currentType, std::optional<DreamPath> varBlockType) {
     if (!statement) return;
 
     // Track when we leave DMStandard
@@ -88,6 +92,7 @@ void DMCodeTreeBuilder::ProcessStatement(DMASTStatement* statement, const DreamP
         bool isVarBlock = false;
         DreamPath innerType = typePath;
         auto elements = typePath.GetElements();
+        
         if (!elements.empty() && elements.back() == "var") {
             isVarBlock = true;
             // Remove "var" from the path to get the actual type
@@ -96,17 +101,52 @@ void DMCodeTreeBuilder::ProcessStatement(DMASTStatement* statement, const DreamP
                 std::cout << "  Processing var block at: " << typePath.ToString() 
                          << " (type: " << innerType.ToString() << ")" << std::endl;
             }
+            // Process inner statements with var block context (no accumulated type yet)
+            for (const auto& innerStmt : objectDef->InnerStatements) {
+                ProcessStatementWithVarContext(innerStmt.get(), innerType, DreamPath(DreamPath::PathType::Absolute, {}));
+            }
+        } else if (varBlockType.has_value()) {
+            // We're inside a var block context, and this is a type specifier (like "list")
+            // Don't create an object type for this - it's a type path for variables
+            // Accumulate the type path
+            DreamPath accumulatedType = varBlockType.value().Combine(objectDef->Path.Path);
+            
+            if (Compiler_->GetSettings().Verbose) {
+                std::cout << "  Inside var block, accumulated type: " << accumulatedType.ToString() << std::endl;
+            }
+            
+            // Process inner statements with the accumulated type
+            for (const auto& innerStmt : objectDef->InnerStatements) {
+                ProcessStatementWithVarContext(innerStmt.get(), currentType, accumulatedType);
+            }
         } else {
+            // Normal object definition - not in var block context
             // Add the type to the object tree
             ObjectTree_->AddType(typePath);
+            
+            for (const auto& innerStmt : objectDef->InnerStatements) {
+                ProcessStatementWithVarContext(innerStmt.get(), innerType, std::nullopt);
+            }
         }
-        
-        for (const auto& innerStmt : objectDef->InnerStatements) {
-            ProcessStatement(innerStmt.get(), innerType);
-        }
+        return;
     }
     // Variable definition: var/name = value
     else if (auto* varDef = dynamic_cast<DMASTObjectVarDefinition*>(statement)) {
+        // If we're in a var block context, apply the accumulated type
+        std::optional<DreamPath> effectiveType;
+        
+        if (!varDef->TypePath.Path.GetElements().empty()) {
+            // TypePath is set - convert to absolute if relative
+            if (varDef->TypePath.Path.GetPathType() == DreamPath::PathType::Relative) {
+                // Make it absolute by combining with root
+                effectiveType = DreamPath(DreamPath::PathType::Absolute, varDef->TypePath.Path.GetElements());
+            } else {
+                effectiveType = varDef->TypePath.Path;
+            }
+        } else if (varBlockType.has_value() && !varBlockType->GetElements().empty()) {
+            effectiveType = varBlockType;
+        }
+        
         // Check for DMStandard modification
         if (DMStandardFinalized_) {
             DMObject* obj = ObjectTree_->GetType(currentType);
@@ -118,9 +158,9 @@ void DMCodeTreeBuilder::ProcessStatement(DMASTStatement* statement, const DreamP
 
         // Add the variable to the current type
         // The variable's name is stored in varDef->Name
-        // The variable's type constraint (if any) is in varDef->TypePath
+        // The variable's type constraint (if any) is in varDef->TypePath (or from var block context)
         ObjectTree_->AddType(currentType);
-        ObjectTree_->AddObjectVar(currentType, varDef);
+        ObjectTree_->AddObjectVar(currentType, varDef, effectiveType);
     }
     // Variable override: existing_var = new_value
     else if (auto* varOverride = dynamic_cast<DMASTObjectVarOverride*>(statement)) {

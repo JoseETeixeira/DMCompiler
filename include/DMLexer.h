@@ -30,6 +30,7 @@ private:
     Token ParseResource();
     Token ParseOperator();
     Token ParsePreprocessorDirective();
+    Token ContinueString();  // Continue parsing a string after embedded expression
     
     bool IsWhitespace(char c) const;
     bool IsDigit(char c) const;
@@ -48,6 +49,12 @@ private:
     std::stack<int> indentationStack_;
     std::queue<Token> pendingTokens_;
     int bracketNesting_ = 0;
+    
+    // String interpolation state
+    bool inInterpolatedString_ = false;
+    char stringQuoteChar_ = 0;
+    int stringBracketNesting_ = 0;
+    Location stringStartLoc_;
 };
 
 } // namespace DMCompiler

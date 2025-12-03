@@ -124,32 +124,39 @@ Token DMParser::Advance() {
             CurrentToken_ = Lexer_->GetNextToken();
         }
         
-        // TODO: Handle error and warning tokens if lexer provides them
-        // For now, Error and Warning token types don't exist in TokenType enum
-        /*
-        if (CurrentToken_.Type == TokenType::Error) {
-            Emit(WarningCode::BadToken, CurrentToken_.Text);
-            return Advance();
-        } else if (CurrentToken_.Type == TokenType::Warning) {
-            Warning(CurrentToken_.Text);
-            return Advance();
+        // Handle error and warning tokens from the lexer/preprocessor
+        // These are emitted when the preprocessor encounters #error or #warn directives
+        while (CurrentToken_.Type == TokenType::DM_Preproc_Error || 
+               CurrentToken_.Type == TokenType::DM_Preproc_Warning) {
+            if (CurrentToken_.Type == TokenType::DM_Preproc_Error) {
+                // Preprocessor #error directive - emit as compiler error
+                Emit(WarningCode::BadToken, "Preprocessor error: " + CurrentToken_.Text);
+            } else {
+                // Preprocessor #warn directive - emit as compiler warning
+                Warning("Preprocessor warning: " + CurrentToken_.Text);
+            }
+            // Skip to next token after handling
+            CurrentToken_ = Lexer_->GetNextToken();
+            
+            // Continue skipping whitespace after error/warning
+            while (CurrentToken_.Type == TokenType::DM_Preproc_Whitespace) {
+                CurrentToken_ = Lexer_->GetNextToken();
+            }
         }
-        */
     }
     return CurrentToken_;
 }
 
 bool DMParser::Check(TokenType type) {
-    if (CurrentToken_.Type == type) {
-        Advance();
-        return true;
-    }
-    return false;
+    // Check() just checks - it does NOT advance the token
+    return CurrentToken_.Type == type;
 }
 
 void DMParser::Consume(TokenType type, const std::string& errorMessage) {
     if (!Check(type)) {
         Emit(WarningCode::BadToken, errorMessage);
+    } else {
+        Advance(); // Consume the token only when it matches
     }
 }
 
@@ -160,16 +167,16 @@ void DMParser::ReuseToken(Token token) {
 
 void DMParser::Warning(const std::string& message, const Token* token) {
     const Token& t = token ? *token : CurrentToken_;
-    // TODO: Call compiler warning method
-    // For now, just ignore
-    (void)t;  // Suppress unused parameter warning
-    (void)message;
+    if (Compiler_) {
+        // Use ForcedWarning with location info included in message
+        Compiler_->ForcedWarning(t.Loc.ToString() + ": " + message);
+    }
 }
 
 void DMParser::Emit(WarningCode code, const std::string& message) {
-    // TODO: Call compiler emit method
-    (void)code;  // Suppress unused parameter warning
-    (void)message;
+    if (Compiler_) {
+        Compiler_->Emit(code, CurrentToken_.Loc, message);
+    }
 }
 
 Location DMParser::CurrentLocation() const {
@@ -398,6 +405,11 @@ std::unique_ptr<DMASTExpression> DMParser::PrimaryExpression() {
         Advance();
         return std::make_unique<DMASTConstantString>(loc, token.Value.StringValue);
     }
+    
+    // Interpolated string (starts with DM_Preproc_StringBegin)
+    if (token.Type == TokenType::DM_Preproc_StringBegin) {
+        return ParseInterpolatedString();
+    }
 
     // Resource literal
     if (token.Type == TokenType::Resource) {
@@ -568,12 +580,23 @@ std::unique_ptr<DMASTExpression> DMParser::ComparisonExpression() {
     auto left = ShiftExpression();
     
     // Left-associative: keep consuming while we see comparison operators
-    // Handles: ==, !=, <, >, <=, >=, in
+    // Handles: ==, !=, <, >, <=, >=, in, to
     while (IsInSet(Current().Type, ComparisonTypes_) || 
            IsInSet(Current().Type, LtGtComparisonTypes_) ||
-           Current().Type == TokenType::In) {
+           Current().Type == TokenType::In ||
+           Current().Type == TokenType::To) {
         Location loc = CurrentLocation();
-        BinaryOperator op = TokenTypeToBinaryOp(Current().Type);
+        
+        // Map token to binary operator
+        BinaryOperator op;
+        if (Current().Type == TokenType::In) {
+            op = BinaryOperator::In;
+        } else if (Current().Type == TokenType::To) {
+            op = BinaryOperator::To;
+        } else {
+            op = TokenTypeToBinaryOp(Current().Type);
+        }
+        
         Advance();
         auto right = ShiftExpression();
         left = std::make_unique<DMASTExpressionBinary>(loc, op, std::move(left), std::move(right));
@@ -658,14 +681,42 @@ std::unique_ptr<DMASTExpression> DMParser::PostfixExpression() {
     auto expr = PrimaryExpression();
     
     // Handle postfix operations (left-to-right)
-    // These include: member access (.), function calls (), array indexing [], post-increment (++), post-decrement (--)
-    // Note: Colon (:) is NOT handled here to avoid conflicts with ternary operator
+    // These include: member access (. or :), null-conditional (?.), function calls (), array indexing [], post-increment (++), post-decrement (--)
+    // Track if we just completed a function call to help disambiguate colon
+    bool justCompletedCall = false;
+    
     while (true) {
         Location loc = CurrentLocation();
         
-        // Member access: obj.property
-        if (Current().Type == TokenType::Period) {
+        // Check for colon runtime member access (obj:prop)
+        // This is tricky because colon is also used in ternary (cond ? a : b)
+        // Heuristic: if we just completed a function call like func(), the colon is likely ternary
+        // If the left side is a simple identifier or dereference, colon is likely member access
+        bool isColonMemberAccess = false;
+        if (Current().Type == TokenType::Colon && !justCompletedCall) {
+            // Peek at next token to see if it's an identifier
+            Token colonToken = Current();
+            Token nextToken = Advance();
+            if (IsInSet(nextToken.Type, IdentifierTypes_)) {
+                isColonMemberAccess = true;
+                ReuseToken(nextToken);
+                CurrentToken_ = colonToken;
+            } else {
+                ReuseToken(nextToken);
+                CurrentToken_ = colonToken;
+            }
+        }
+        
+        // Member access: obj.property, obj:property (runtime), or obj?.property (null-conditional)
+        if (Current().Type == TokenType::Period || Current().Type == TokenType::QuestionDot || isColonMemberAccess) {
+            DereferenceType derefType = DereferenceType::Direct;
+            if (Current().Type == TokenType::QuestionDot) {
+                derefType = DereferenceType::Safe;
+            } else if (isColonMemberAccess) {
+                derefType = DereferenceType::Search;
+            }
             Advance();
+            justCompletedCall = false;
             
             // Parse the property name (identifier or expression in brackets)
             std::unique_ptr<DMASTExpression> property;
@@ -680,27 +731,57 @@ std::unique_ptr<DMASTExpression> DMParser::PostfixExpression() {
                 property = Expression();
                 Consume(TokenType::RightBracket, "Expected ']' after dynamic property access");
             } else {
-                Emit(WarningCode::BadToken, "Expected property name after '.'");
+                const char* opStr = (derefType == DereferenceType::Safe) ? "?." : ".";
+                Emit(WarningCode::BadToken, "Expected property name after '" + std::string(opStr) + "'");
                 break;
             }
             
-            expr = std::make_unique<DMASTDereference>(loc, std::move(expr), DereferenceType::Direct, std::move(property));
+            expr = std::make_unique<DMASTDereference>(loc, std::move(expr), derefType, std::move(property));
         }
         // Function call: func(args)
         else if (Current().Type == TokenType::LeftParenthesis) {
             Advance();
+            
+            // Check if this is a pick() call which has special weighted syntax
+            bool isPickCall = false;
+            if (auto* ident = dynamic_cast<DMASTIdentifier*>(expr.get())) {
+                isPickCall = (ident->Identifier == "pick");
+            }
             
             // Parse argument list
             std::vector<std::unique_ptr<DMASTCallParameter>> parameters;
             
             if (Current().Type != TokenType::RightParenthesis) {
                 do {
+                    // Check for empty argument (consecutive comma or trailing comma)
+                    // In DM, func(a,,b) is valid and the middle argument is null
+                    if (Current().Type == TokenType::Comma) {
+                        // Empty argument - push a null placeholder
+                        parameters.push_back(std::make_unique<DMASTCallParameter>(
+                            CurrentLocation(), 
+                            std::make_unique<DMASTConstantNull>(CurrentLocation())));
+                        Advance(); // consume comma
+                        continue;
+                    }
+                    
                     // Parse argument - handle named parameters (name = value)
                     // We parse up to ternary level to avoid treating = as assignment
                     auto argExpr = TernaryExpression();
                     
+                    // For pick(): handle weight;value syntax
+                    // The semicolon separates weight from value in weighted pick
+                    if (isPickCall && Current().Type == TokenType::Semicolon) {
+                        // This is a weighted pick argument: weight;value
+                        // Store weight as Key, value as Value
+                        Location paramLoc = CurrentLocation();
+                        Advance(); // consume ';'
+                        auto valueExpr = TernaryExpression();
+                        
+                        // Use Key for weight, Value for the actual value
+                        parameters.push_back(std::make_unique<DMASTCallParameter>(paramLoc, std::move(valueExpr), std::move(argExpr)));
+                    }
                     // Check for named parameter syntax: name = value
-                    if (Current().Type == TokenType::Assign) {
+                    else if (Current().Type == TokenType::Assign) {
                         // This is a named parameter: name = value
                         // The argExpr should be an identifier (the parameter name)
                         Location paramLoc = CurrentLocation();
@@ -763,6 +844,7 @@ std::unique_ptr<DMASTExpression> DMParser::PostfixExpression() {
             }
             
             expr = std::move(call);
+            justCompletedCall = true;  // Mark that we just finished a function call
         }
         // Array indexing: array[index]
         // In DM, this is treated as member access with brackets
@@ -773,16 +855,19 @@ std::unique_ptr<DMASTExpression> DMParser::PostfixExpression() {
             
             // Array indexing is represented as dereference with the index as the property
             expr = std::make_unique<DMASTDereference>(loc, std::move(expr), DereferenceType::Index, std::move(index));
+            justCompletedCall = false;
         }
         // Post-increment: x++
         else if (Current().Type == TokenType::Increment) {
             Advance();
             expr = std::make_unique<DMASTExpressionUnary>(loc, UnaryOperator::PostIncrement, std::move(expr));
+            justCompletedCall = false;
         }
         // Post-decrement: x--
         else if (Current().Type == TokenType::Decrement) {
             Advance();
             expr = std::make_unique<DMASTExpressionUnary>(loc, UnaryOperator::PostDecrement, std::move(expr));
+            justCompletedCall = false;
         }
         // No more postfix operations
         else {
@@ -826,8 +911,16 @@ std::unique_ptr<DMASTExpression> DMParser::PathExpression() {
     }
     
     // Parse path elements (identifiers separated by /)
+    // Allow keywords that can appear in paths: var, proc, verb, global, const, tmp, static
     std::vector<std::string> elements;
-    while (IsInSet(Current().Type, IdentifierTypes_) || Current().Type == TokenType::Global) {
+    while (IsInSet(Current().Type, IdentifierTypes_) || 
+           Current().Type == TokenType::Global ||
+           Current().Type == TokenType::Var ||
+           Current().Type == TokenType::Proc ||
+           Current().Type == TokenType::Verb ||
+           Current().Type == TokenType::Const ||
+           Current().Type == TokenType::Tmp ||
+           Current().Type == TokenType::Static) {
         elements.push_back(Current().Text);
         Advance();
         
@@ -844,19 +937,79 @@ std::unique_ptr<DMASTExpression> DMParser::PathExpression() {
     return std::make_unique<DMASTConstantPath>(loc, astPath);
 }
 
-// Parse new expressions: new /type or new type()
+// Parse interpolated string: "start [expr1] middle [expr2] end"
+// The lexer emits: DM_Preproc_StringBegin, <expr tokens>, DM_Preproc_StringMiddle/End, ...
+std::unique_ptr<DMASTExpression> DMParser::ParseInterpolatedString() {
+    Location loc = CurrentLocation();
+    std::vector<std::string> stringParts;
+    std::vector<std::unique_ptr<DMASTExpression>> expressions;
+    
+    // First part is the StringBegin token
+    if (Current().Type != TokenType::DM_Preproc_StringBegin) {
+        Emit(WarningCode::BadToken, "Expected string begin in interpolated string");
+        return std::make_unique<DMASTConstantString>(loc, "");
+    }
+    
+    stringParts.push_back(Current().Value.StringValue);
+    Advance();
+    
+    // Now parse alternating: expression, string part
+    while (Current().Type != TokenType::EndOfFile) {
+        // Parse the embedded expression
+        auto expr = Expression();
+        if (!expr) {
+            Emit(WarningCode::BadToken, "Expected expression in string interpolation");
+            break;
+        }
+        expressions.push_back(std::move(expr));
+        
+        // After the expression, expect either StringMiddle or StringEnd
+        if (Current().Type == TokenType::DM_Preproc_StringMiddle) {
+            stringParts.push_back(Current().Value.StringValue);
+            Advance();
+            // Continue to next expression
+        } else if (Current().Type == TokenType::DM_Preproc_StringEnd) {
+            stringParts.push_back(Current().Value.StringValue);
+            Advance();
+            // Done with the string
+            break;
+        } else {
+            // Missing string continuation - error recovery
+            Emit(WarningCode::BadToken, "Expected string continuation after interpolated expression");
+            stringParts.push_back("");
+            break;
+        }
+    }
+    
+    return std::make_unique<DMASTStringFormat>(loc, std::move(stringParts), std::move(expressions));
+}
+
+// Parse new expressions: new /type or new type() or just new (infer type from context)
 std::unique_ptr<DMASTExpression> DMParser::NewExpression() {
     Location loc = CurrentLocation();
     Consume(TokenType::New, "Expected 'new'");
     
-    // Parse the type expression
-    // We use PrimaryExpression to handle paths, identifiers, parenthesized exprs
-    auto typeExpr = PrimaryExpression();
+    // Check if there's a type expression or if new is standalone
+    // In DM, "new" without a type uses the declared type of the variable being assigned
+    // e.g., var/list/L = new  ->  creates a new /list
     
-    if (!typeExpr) {
-        Emit(WarningCode::BadToken, "Expected type expression after 'new'");
-        return std::make_unique<DMASTConstantNull>(loc);
+    std::unique_ptr<DMASTExpression> typeExpr;
+    
+    // Only try to parse type if we're not immediately at a delimiter or argument list
+    // new() with no type means "infer type from context"
+    // new(...) with no type means "infer type and call constructor with args"
+    if (Current().Type != TokenType::Newline && 
+        Current().Type != TokenType::Semicolon &&
+        Current().Type != TokenType::Comma &&
+        Current().Type != TokenType::RightParenthesis &&
+        Current().Type != TokenType::LeftParenthesis &&  // new() - infer type, call constructor
+        Current().Type != TokenType::EndOfFile) {
+        // Parse the type expression
+        // We use PrimaryExpression to handle paths, identifiers, parenthesized exprs
+        typeExpr = PrimaryExpression();
     }
+    
+    // typeExpr can be null - this means "new" without explicit type (infer from context)
     
     // Check for optional constructor call parameters
     std::vector<std::unique_ptr<DMASTCallParameter>> parameters;
@@ -899,8 +1052,18 @@ std::unique_ptr<DMASTExpression> DMParser::ListExpression(const Location& loc, b
     
     std::vector<std::unique_ptr<DMASTCallParameter>> values;
     
+    // Skip whitespace and newlines - list literals can span multiple lines
+    while (Current().Type == TokenType::Newline || Current().Type == TokenType::Skip) {
+        Advance();
+    }
+    
     if (Current().Type != TokenType::RightParenthesis) {
         do {
+            // Skip whitespace and newlines before each element
+            while (Current().Type == TokenType::Newline || Current().Type == TokenType::Skip) {
+                Advance();
+            }
+            
             // In list literals, "=" is used for key=value association, NOT assignment
             // So we parse up to ternary level (before assignment) and handle = separately
             auto keyExpr = TernaryExpression();
@@ -920,8 +1083,17 @@ std::unique_ptr<DMASTExpression> DMParser::ListExpression(const Location& loc, b
                 values.push_back(std::make_unique<DMASTCallParameter>(keyExpr->Location_, std::move(keyExpr)));
             }
             
+            // Skip whitespace and newlines after element
+            while (Current().Type == TokenType::Newline || Current().Type == TokenType::Skip) {
+                Advance();
+            }
+            
             if (Current().Type == TokenType::Comma) {
                 Advance();
+                // Skip whitespace and newlines after comma
+                while (Current().Type == TokenType::Newline || Current().Type == TokenType::Skip) {
+                    Advance();
+                }
             } else {
                 break;
             }
@@ -1339,8 +1511,19 @@ std::unique_ptr<DMASTProcBlockInner> DMParser::ProcBlockInner(int baseIndent) {
     } else {
         // Single statement on same line, or just a semicolon (empty body)
         // First, consume any leading semicolons (empty statements)
+        bool hadSemicolon = false;
         while (Current().Type == TokenType::Semicolon) {
             Advance();
+            hadSemicolon = true;
+        }
+        
+        // If we consumed a semicolon and now see newline/EOF, it was an empty body
+        // e.g., "while(condition);" - don't try to parse another statement
+        if (hadSemicolon && (Current().Type == TokenType::Newline || 
+                             Current().Type == TokenType::EndOfFile ||
+                             Current().Type == TokenType::RightCurlyBracket)) {
+            // Empty body - just return empty block
+            return std::make_unique<DMASTProcBlockInner>(loc, std::move(statements));
         }
         
         // Now try to parse a single statement if there is one
@@ -1639,21 +1822,93 @@ std::unique_ptr<DMASTProcStatement> DMParser::ProcStatementIf() {
     auto body = ProcBlockInner(loc.Column);
     
     // After an indented body, we might be at a newline before the else
-    // Consume any newlines/whitespace to check for else
+    // Consume newlines/whitespace, but stop before statements at wrong indentation
     while (Current().Type == TokenType::Newline || IsInSet(Current().Type, WhitespaceTypes_)) {
         Advance();
     }
     
-    // Else clause (optional)
+    // Else clause (optional) - only if it's at the SAME column as the if statement
+    // This prevents incorrectly associating an else from an outer scope
     std::unique_ptr<DMASTProcBlockInner> elseBody;
-    if (Current().Type == TokenType::Else) {
+    if (Current().Type == TokenType::Else && CurrentLocation().Column == loc.Column) {
         Advance();
         
         // Consume only whitespace before else body - let ProcBlockInner handle newlines
         Whitespace();
         
-        // Use if statement's column as base indent (else is at same level as if)
-        elseBody = ProcBlockInner(loc.Column);
+        // Check for "else if" pattern - if immediately followed by 'if', treat the
+        // entire 'if' statement as the else body but use the original 'else' column
+        // for body indentation. This handles:
+        //     if(a)
+        //         stmt1
+        //     else if(b)
+        //         stmt2  <- This should be at column > loc.Column, not > column of 'if'
+        if (Current().Type == TokenType::If) {
+            // Parse the chained if using THIS if's column (loc.Column) as base indent
+            auto chainedIf = ProcStatementIfWithBaseIndent(loc.Column);
+            if (chainedIf) {
+                std::vector<std::unique_ptr<DMASTProcStatement>> stmts;
+                stmts.push_back(std::move(chainedIf));
+                elseBody = std::make_unique<DMASTProcBlockInner>(CurrentLocation(), std::move(stmts));
+            }
+        } else {
+            // Use if statement's column as base indent (else is at same level as if)
+            elseBody = ProcBlockInner(loc.Column);
+        }
+    }
+    
+    return std::make_unique<DMASTProcStatementIf>(loc, std::move(condition), 
+                                                   std::move(body), std::move(elseBody));
+}
+
+std::unique_ptr<DMASTProcStatement> DMParser::ProcStatementIfWithBaseIndent(int baseIndent) {
+    // This is called for "else if" chains - the if uses the else's column for body indentation
+    Location loc = CurrentLocation();
+    Consume(TokenType::If, "Expected 'if'");
+    
+    // Condition (required, in parentheses)
+    Consume(TokenType::LeftParenthesis, "Expected '(' after 'if'");
+    auto condition = Expression();
+    Consume(TokenType::RightParenthesis, "Expected ')' after condition");
+    
+    if (!condition) {
+        Emit(WarningCode::BadToken, "Expected condition in if statement");
+        return nullptr;
+    }
+    
+    // Consume only whitespace before body - let ProcBlockInner handle newlines
+    Whitespace();
+    
+    // Body - use the provided baseIndent (from the else clause), not this if's column
+    auto body = ProcBlockInner(baseIndent);
+    
+    // After an indented body, we might be at a newline before the else
+    // Consume newlines/whitespace, but stop before statements at wrong indentation
+    while (Current().Type == TokenType::Newline || IsInSet(Current().Type, WhitespaceTypes_)) {
+        Advance();
+    }
+    
+    // Else clause (optional) - only if it's at the SAME column as the base indent
+    std::unique_ptr<DMASTProcBlockInner> elseBody;
+    if (Current().Type == TokenType::Else && CurrentLocation().Column == baseIndent) {
+        Advance();
+        
+        // Consume only whitespace before else body
+        Whitespace();
+        
+        // Check for another "else if" in the chain
+        if (Current().Type == TokenType::If) {
+            // Continue the chain with the same base indent
+            auto chainedIf = ProcStatementIfWithBaseIndent(baseIndent);
+            if (chainedIf) {
+                std::vector<std::unique_ptr<DMASTProcStatement>> stmts;
+                stmts.push_back(std::move(chainedIf));
+                elseBody = std::make_unique<DMASTProcBlockInner>(CurrentLocation(), std::move(stmts));
+            }
+        } else {
+            // Final else block
+            elseBody = ProcBlockInner(baseIndent);
+        }
     }
     
     return std::make_unique<DMASTProcStatementIf>(loc, std::move(condition), 
@@ -1765,16 +2020,83 @@ std::unique_ptr<DMASTProcStatement> DMParser::ProcStatementFor() {
         }
     }
     
-    // Check if this is a for-in loop
+    // Check if this is a for-in loop or a for-to (range) loop
     bool isForIn = (Current().Type == TokenType::In);
+    bool isForTo = (Current().Type == TokenType::To);
     bool implicitInWorld = false;
 
+    // Check for implicit range loop (where 'to' was consumed as binary operator)
+    std::unique_ptr<DMASTExpression> implicitRangeEnd;
+    if (!isForIn && !isForTo && firstExpr) {
+        if (auto* varDecl = dynamic_cast<DMASTProcStatementVarDeclaration*>(firstExpr.get())) {
+            if (!varDecl->Decls.empty() && varDecl->Decls[0].Value) {
+                if (auto* binExpr = dynamic_cast<DMASTExpressionBinary*>(varDecl->Decls[0].Value.get())) {
+                    if (binExpr->Operator == BinaryOperator::To) {
+                        implicitRangeEnd = std::move(binExpr->Right);
+                        varDecl->Decls[0].Value = std::move(binExpr->Left);
+                        isForTo = true;
+                    }
+                }
+            }
+        } else if (auto* assign = dynamic_cast<DMASTAssign*>(firstExpr.get())) {
+            if (auto* binExpr = dynamic_cast<DMASTExpressionBinary*>(assign->Value.get())) {
+                if (binExpr->Operator == BinaryOperator::To) {
+                    implicitRangeEnd = std::move(binExpr->Right);
+                    assign->Value = std::move(binExpr->Left);
+                    isForTo = true;
+                }
+            }
+        }
+    }
+
     // Check for implicit "in world" loop: for(var/type/name)
-    if (!isForIn && seenVar && Current().Type == TokenType::RightParenthesis) {
+    if (!isForIn && !isForTo && seenVar && Current().Type == TokenType::RightParenthesis) {
         if (dynamic_cast<DMASTConstantPath*>(firstExpr.get())) {
             isForIn = true;
             implicitInWorld = true;
         }
+    }
+
+    if (isForTo) {
+        // for(var/x = start to end [step value]) - numeric range loop
+        std::unique_ptr<DMASTExpression> endExpr;
+        
+        if (implicitRangeEnd) {
+            endExpr = std::move(implicitRangeEnd);
+        } else {
+            Advance(); // Consume 'to'
+            
+            // Parse end expression
+            endExpr = Expression();
+            if (!endExpr) {
+                Emit(WarningCode::BadExpression, "Expected end value after 'to' in for loop");
+                return nullptr;
+            }
+        }
+        
+        // Check for optional 'step' clause
+        std::unique_ptr<DMASTExpression> stepExpr;
+        if (Current().Type == TokenType::Step) {
+            Advance(); // Consume 'step'
+            stepExpr = Expression();
+            if (!stepExpr) {
+                Emit(WarningCode::BadExpression, "Expected step value after 'step' in for loop");
+            }
+        }
+        
+        Consume(TokenType::RightParenthesis, "Expected ')' after for-to range");
+        
+        // Consume only whitespace before body - let ProcBlockInner handle newlines
+        Whitespace();
+        
+        // Body - pass the for statement's column as base indent
+        auto body = ProcBlockInner(loc.Column);
+        
+        // Create a for-range statement
+        // The firstExpr is the initializer (var/x = start)
+        return std::make_unique<DMASTProcStatementForRange>(loc, std::move(firstExpr), 
+                                                            std::move(endExpr), std::move(stepExpr), 
+                                                            std::move(body));
     }
 
     if (isForIn) {
@@ -1934,8 +2256,29 @@ std::unique_ptr<DMASTProcStatement> DMParser::ProcStatementDoWhile() {
     Location loc = CurrentLocation();
     Consume(TokenType::Do, "Expected 'do'");
     
-    // Body - pass the do statement's column as base indent
-    auto body = ProcBlockInner(loc.Column);
+    // Skip whitespace after 'do'
+    Whitespace();
+    
+    // Check if the body is on the same line as 'do' (single statement style)
+    // In DM: "do statement" with "while(...)" on the next line
+    std::unique_ptr<DMASTProcBlockInner> body;
+    if (Current().Type != TokenType::Newline && Current().Type != TokenType::LeftCurlyBracket) {
+        // Single statement on same line as 'do'
+        auto stmt = ProcStatement();
+        std::vector<std::unique_ptr<DMASTProcStatement>> stmts;
+        if (stmt) {
+            stmts.push_back(std::move(stmt));
+        }
+        body = std::make_unique<DMASTProcBlockInner>(loc, std::move(stmts));
+        
+        // Skip newlines to get to 'while'
+        while (Current().Type == TokenType::Newline || Current().Type == TokenType::DM_Preproc_Whitespace) {
+            Advance();
+        }
+    } else {
+        // Block style body - pass the do statement's column as base indent
+        body = ProcBlockInner(loc.Column);
+    }
     
     // While keyword
     Consume(TokenType::While, "Expected 'while' after do-while body");
@@ -1965,12 +2308,44 @@ std::unique_ptr<DMASTProcStatement> DMParser::ProcStatementSwitch() {
     }
     Consume(TokenType::RightParenthesis, "Expected ')' after switch value");
     
-    // Switch body with cases
-    Consume(TokenType::LeftCurlyBracket, "Expected '{' to start switch body");
+    // Switch body with cases - can use braces or indentation
+    bool useBraces = false;
+    if (Check(TokenType::LeftCurlyBracket)) {
+        useBraces = true;
+        Advance(); // Consume '{'
+    }
+    
+    // Skip whitespace and newlines to get to cases
+    Whitespace();
     
     std::vector<DMASTProcStatementSwitch::SwitchCase> cases;
     
-    while (Current().Type != TokenType::RightCurlyBracket && Current().Type != TokenType::EndOfFile) {
+    while (Current().Type != TokenType::EndOfFile) {
+        // For indentation-based switch, we stop when we see something
+        // at the same or lesser indentation that's not a case
+        if (!useBraces) {
+            // Skip newlines and whitespace to get to the next case
+            while (Current().Type == TokenType::Newline || 
+                   Current().Type == TokenType::DM_Preproc_Whitespace) {
+                Advance();
+            }
+            
+            // If we hit something that's not a case keyword, we're done
+            if (Current().Type != TokenType::If && Current().Type != TokenType::Else) {
+                break;
+            }
+        } else {
+            // For brace-based, skip whitespace and check for closing brace
+            Whitespace();
+            if (Current().Type == TokenType::Newline) {
+                Advance();
+                continue;
+            }
+            if (Current().Type == TokenType::RightCurlyBracket) {
+                break;
+            }
+        }
+        
         Whitespace();
         
         if (Current().Type == TokenType::If) {
@@ -1987,28 +2362,43 @@ std::unique_ptr<DMASTProcStatement> DMParser::ProcStatementSwitch() {
                 if (caseValue) {
                     Whitespace();
                     
-                    // Check for "to" keyword to create a range expression
-                    // Note: Expression() should not consume "to" since it's not implemented as a binary operator
-                    if (Current().Type == TokenType::To) {
-                        Location rangeLoc = CurrentLocation();
-                        Advance();  // Consume "to"
-                        Whitespace();
-                        
-                        auto rangeEnd = Expression();
-                        if (!rangeEnd) {
-                            Warning("Expected upper bound for range in switch case");
-                            rangeEnd = std::make_unique<DMASTConstantNull>(rangeLoc);
+                    bool handled = false;
+                    if (auto* binExpr = dynamic_cast<DMASTExpressionBinary*>(caseValue.get())) {
+                        if (binExpr->Operator == BinaryOperator::To) {
+                            auto rangeExpr = std::make_unique<DMASTSwitchCaseRange>(
+                                binExpr->Location_,
+                                std::move(binExpr->Left),
+                                std::move(binExpr->Right)
+                            );
+                            values.push_back(std::move(rangeExpr));
+                            handled = true;
                         }
-                        
-                        // Create a DMASTSwitchCaseRange node
-                        auto rangeExpr = std::make_unique<DMASTSwitchCaseRange>(
-                            rangeLoc,
-                            std::move(caseValue),
-                            std::move(rangeEnd)
-                        );
-                        values.push_back(std::move(rangeExpr));
-                    } else {
-                        values.push_back(std::move(caseValue));
+                    }
+
+                    if (!handled) {
+                        // Check for "to" keyword to create a range expression
+                        // Note: Expression() should not consume "to" since it's not implemented as a binary operator
+                        if (Current().Type == TokenType::To) {
+                            Location rangeLoc = CurrentLocation();
+                            Advance();  // Consume "to"
+                            Whitespace();
+                            
+                            auto rangeEnd = Expression();
+                            if (!rangeEnd) {
+                                Warning("Expected upper bound for range in switch case");
+                                rangeEnd = std::make_unique<DMASTConstantNull>(rangeLoc);
+                            }
+                            
+                            // Create a DMASTSwitchCaseRange node
+                            auto rangeExpr = std::make_unique<DMASTSwitchCaseRange>(
+                                rangeLoc,
+                                std::move(caseValue),
+                                std::move(rangeEnd)
+                            );
+                            values.push_back(std::move(rangeExpr));
+                        } else {
+                            values.push_back(std::move(caseValue));
+                        }
                     }
                 }
                 
@@ -2048,7 +2438,9 @@ std::unique_ptr<DMASTProcStatement> DMParser::ProcStatementSwitch() {
         Whitespace();
     }
     
-    Consume(TokenType::RightCurlyBracket, "Expected '}' to end switch body");
+    if (useBraces) {
+        Consume(TokenType::RightCurlyBracket, "Expected '}' to end switch body");
+    }
     
     return std::make_unique<DMASTProcStatementSwitch>(loc, std::move(value), std::move(cases));
 }
@@ -2057,14 +2449,23 @@ std::unique_ptr<DMASTProcStatement> DMParser::ProcStatementDel() {
     Location loc = CurrentLocation();
     Consume(TokenType::Del, "Expected 'del'");
     
-    // del takes an expression
-    Consume(TokenType::LeftParenthesis, "Expected '(' after 'del'");
+    // del takes an expression - parentheses are optional
+    // Both "del(expr)" and "del expr" are valid
+    bool hasParens = false;
+    if (Check(TokenType::LeftParenthesis)) {
+        Advance();
+        hasParens = true;
+    }
+    
     auto value = Expression();
     if (!value) {
         Emit(WarningCode::BadToken, "Expected expression in del statement");
         return nullptr;
     }
-    Consume(TokenType::RightParenthesis, "Expected ')' after del value");
+    
+    if (hasParens) {
+        Consume(TokenType::RightParenthesis, "Expected ')' after del value");
+    }
     
     return std::make_unique<DMASTProcStatementDel>(loc, std::move(value));
 }
@@ -2541,7 +2942,7 @@ std::unique_ptr<DMASTObjectStatement> DMParser::ObjectStatement() {
                 auto pathElements = path.Path.GetElements();
                 std::string varName = pathElements.empty() ? "" : pathElements.back();
                 
-                // Extract type path (all elements except the last one)
+                // Extract type path (all elements except the last one from the local path)
                 std::vector<std::string> typeElements;
                 if (pathElements.size() > 1) {
                     typeElements.assign(pathElements.begin(), pathElements.end() - 1);
@@ -2552,6 +2953,22 @@ std::unique_ptr<DMASTObjectStatement> DMParser::ObjectStatement() {
                 // var/x -> type is empty (implicit), name is x
                 if (pathStartsVar && !typeElements.empty() && typeElements[0] == "var") {
                     typeElements.erase(typeElements.begin());
+                }
+                
+                // If typeElements is empty, extract type from CurrentPath_ context
+                // This handles nested blocks like: var/list/tolog = new()
+                // where CurrentPath_ is "/global/var/list" and path is just "tolog"
+                if (typeElements.empty() && !pathStartsVar) {
+                    // Extract type from CurrentPath_ - find elements after "var"
+                    const auto& currentElements = CurrentPath_.GetElements();
+                    bool foundVar = false;
+                    for (const auto& elem : currentElements) {
+                        if (foundVar) {
+                            typeElements.push_back(elem);
+                        } else if (elem == "var") {
+                            foundVar = true;
+                        }
+                    }
                 }
                 
                 // Create type path (preserve absolute/relative from original path)
@@ -2573,14 +2990,18 @@ std::unique_ptr<DMASTObjectStatement> DMParser::ObjectStatement() {
             }
         }
         
-        // Check for [ -> array syntax (e.g., techs[0])
+        // Check for [ -> array syntax (e.g., techs[0] or weapon[])
         // In a var block, this is a variable definition with array initialization
         if (Current().Type == TokenType::LeftBracket && inVarBlock) {
-            // Parse array size
+            // Parse array size (if present)
             Advance(); // consume [
             Whitespace();
-            auto arraySize = Expression();
-            Whitespace();
+            // Empty brackets (weapon[]) are allowed - declares an empty list
+            std::unique_ptr<DMASTExpression> arraySize = nullptr;
+            if (Current().Type != TokenType::RightBracket) {
+                arraySize = Expression();
+                Whitespace();
+            }
             Consume(TokenType::RightBracket, "Expected ']' after array size");
             
             // For "techs[0]", path is "techs"
@@ -2599,11 +3020,23 @@ std::unique_ptr<DMASTObjectStatement> DMParser::ObjectStatement() {
             DreamPath typePath(path.Path.GetPathType(), typeElements);
             DMASTPath typeASTPath(loc, typePath, false);
             
-            // For now, treat array syntax as uninitialized (null value)
-            // The array size is just a hint, not an initialization value
-            // TODO: In the future, we could create a proper list initialization with the size
+            // Create a proper list initialization: new /list(size)
+            // In DM, var/list/L[5] creates a list pre-sized to 5 elements
+            std::unique_ptr<DMASTExpression> initValue;
+            if (arraySize) {
+                // Create /list path expression
+                DreamPath listPath(DreamPath::PathType::Absolute, {"list"});
+                auto listPathExpr = std::make_unique<DMASTConstantPath>(loc, DMASTPath(loc, listPath, false));
+                
+                // Create parameter list with the size expression
+                std::vector<std::unique_ptr<DMASTCallParameter>> params;
+                params.push_back(std::make_unique<DMASTCallParameter>(arraySize->Location_, std::move(arraySize)));
+                
+                // Create new /list(size) expression
+                initValue = std::make_unique<DMASTNewPath>(loc, std::move(listPathExpr), std::move(params));
+            }
             
-            return std::make_unique<DMASTObjectVarDefinition>(loc, varName, typeASTPath, nullptr, std::nullopt);
+            return std::make_unique<DMASTObjectVarDefinition>(loc, varName, typeASTPath, std::move(initValue), std::nullopt);
         }
         
         // Check for newline/semicolon -> variable definition without initialization (in var block)
@@ -2613,24 +3046,77 @@ std::unique_ptr<DMASTObjectStatement> DMParser::ObjectStatement() {
         if ((Current().Type == TokenType::Newline || 
              Current().Type == TokenType::Semicolon ||
              Current().Type == TokenType::EndOfFile) && inVarBlock && !isVarKeyword) {
-            // Variable definition without initialization
-            // For "Beam/myBeam", path is "Beam/myBeam"
-            // Variable name is the last element: "myBeam"
-            // Variable type is everything before the last element: "Beam"
-            auto pathElements = path.Path.GetElements();
-            std::string varName = pathElements.empty() ? "" : pathElements.back();
             
-            // Extract type path (all elements except the last one)
-            std::vector<std::string> typeElements;
-            if (pathElements.size() > 1) {
-                typeElements.assign(pathElements.begin(), pathElements.end() - 1);
+            // Check if this has a nested indented block after it
+            // If so, treat as a type block (object definition), not a variable definition
+            // This handles patterns like:
+            //   var
+            //       list
+            //           tolog = new()
+            // Where "list" should be a type context block, not a variable named "list"
+            bool hasNestedBlock = false;
+            if (Current().Type == TokenType::Newline) {
+                int currentLineIndent = loc.Column;
+                
+                // Save position for lookahead
+                Token savedNewlineToken = Current();
+                Advance(); // consume newline
+                
+                // Skip any empty lines
+                while (Current().Type == TokenType::Newline) {
+                    Advance();
+                }
+                
+                // Check the indentation of the next non-empty line
+                if (Current().Type != TokenType::EndOfFile) {
+                    int nextLineIndent = GetCurrentIndentation();
+                    if (nextLineIndent > currentLineIndent) {
+                        hasNestedBlock = true;
+                    }
+                }
+                
+                // Backtrack to before the newline
+                ReuseToken(savedNewlineToken);
             }
             
-            // Create type path (preserve absolute/relative from original path)
-            DreamPath typePath(path.Path.GetPathType(), typeElements);
-            DMASTPath typeASTPath(loc, typePath, false);
-            
-            return std::make_unique<DMASTObjectVarDefinition>(loc, varName, typeASTPath, nullptr, std::nullopt);
+            // If there's NO nested block, this is a variable definition without initialization
+            if (!hasNestedBlock) {
+                // For "Beam/myBeam", path is "Beam/myBeam"
+                // Variable name is the last element: "myBeam"
+                // Variable type is everything before the last element: "Beam"
+                auto pathElements = path.Path.GetElements();
+                std::string varName = pathElements.empty() ? "" : pathElements.back();
+                
+                // Extract type path (all elements except the last one)
+                std::vector<std::string> typeElements;
+                if (pathElements.size() > 1) {
+                    typeElements.assign(pathElements.begin(), pathElements.end() - 1);
+                }
+                
+                // If typeElements is empty, extract type from CurrentPath_ context
+                // This handles nested blocks like: var/list/myvar
+                // where CurrentPath_ is "/global/var/list" and path is just "myvar"
+                if (typeElements.empty()) {
+                    // Extract type from CurrentPath_ - find elements after "var"
+                    const auto& currentElements = CurrentPath_.GetElements();
+                    bool foundVar = false;
+                    for (const auto& elem : currentElements) {
+                        if (foundVar) {
+                            typeElements.push_back(elem);
+                        } else if (elem == "var") {
+                            foundVar = true;
+                        }
+                    }
+                }
+                
+                // Create type path (preserve absolute/relative from original path)
+                DreamPath typePath(path.Path.GetPathType(), typeElements);
+                DMASTPath typeASTPath(loc, typePath, false);
+                
+                return std::make_unique<DMASTObjectVarDefinition>(loc, varName, typeASTPath, nullptr, std::nullopt);
+            }
+            // If hasNestedBlock is true, fall through to parse as object definition
+            // This will properly update CurrentPath_ to include the type (e.g., "list")
         }
         
         // Otherwise, backtrack and parse as object definition
@@ -2845,11 +3331,20 @@ std::unique_ptr<DMASTObjectStatement> DMParser::ObjectProcDefinition(bool isVerb
 std::unique_ptr<DMASTDefinitionParameter> DMParser::ProcParameter() {
     Location loc = CurrentLocation();
     
-    // Parameters can be: name, var/type/name, var/name as type, type/name
+    // Parameters can be: name, var/type/name, var/name as type, type/name, or ... (varargs)
     std::string paramName;
     DreamPath typePath;
     bool isList = false;
     std::unique_ptr<DMASTExpression> defaultValue;
+    
+    // Check for varargs (...)
+    if (Current().Type == TokenType::DotDotDot) {
+        paramName = "...";
+        Advance();
+        // Varargs don't have type, default value, or 'as' clause
+        return std::make_unique<DMASTDefinitionParameter>(loc, paramName, typePath, isList,
+                                                          nullptr, nullptr, std::nullopt);
+    }
     
     // Check for var keyword (optional)
     if (Current().Type == TokenType::Var) {
@@ -2895,6 +3390,18 @@ std::unique_ptr<DMASTDefinitionParameter> DMParser::ProcParameter() {
         }
     }
     
+    // Check for list declaration syntax: paramname[] (declares as list type)
+    if (Current().Type == TokenType::LeftBracket) {
+        Advance();
+        // Could be name[] (empty) or name[size]
+        if (Current().Type != TokenType::RightBracket) {
+            // Skip any size expression
+            Expression();
+        }
+        Consume(TokenType::RightBracket, "Expected ']' in parameter list declaration");
+        isList = true;
+    }
+    
     // Check for 'as' type specification
     std::optional<DMComplexValueType> explicitValueType;
     if (Current().Type == TokenType::As) {
@@ -2907,13 +3414,14 @@ std::unique_ptr<DMASTDefinitionParameter> DMParser::ProcParameter() {
         while (Current().Type != TokenType::Comma && 
                Current().Type != TokenType::RightParenthesis &&
                Current().Type != TokenType::Assign &&
+               Current().Type != TokenType::In &&
                Current().Type != TokenType::Newline &&
                Current().Type != TokenType::EndOfFile) {
             
             if (Current().Type == TokenType::BitwiseOr) {
                 typeStr += "|";
                 Advance();
-            } else if (IsInSet(Current().Type, IdentifierTypes_)) {
+            } else if (IsInSet(Current().Type, IdentifierTypes_) || Current().Type == TokenType::Null) {
                 typeStr += Current().Text;
                 Advance();
             } else {
@@ -2926,14 +3434,62 @@ std::unique_ptr<DMASTDefinitionParameter> DMParser::ProcParameter() {
         explicitValueType = DMComplexValueType(flags);
     }
     
+    // Check for 'in' expression (possible values constraint for verbs) - can come before default
+    // e.g., "mob/M in world" or "direction in list("north","south")"
+    std::unique_ptr<DMASTExpression> possibleValues = nullptr;
+    if (Current().Type == TokenType::In) {
+        Advance();
+        possibleValues = Expression();
+    }
+    
     // Check for default value
     if (Current().Type == TokenType::Assign) {
         Advance();
         defaultValue = Expression();
     }
     
+    // Check for 'as' type specification AFTER default value (DM allows both orders)
+    // e.g., "Start = 1 as num" or "Start as num = 1"
+    if (!explicitValueType.has_value() && Current().Type == TokenType::As) {
+        Advance();
+        
+        // Parse type flags (e.g., "num", "text", "num|text")
+        std::string typeStr;
+        
+        // Collect type tokens until we hit a delimiter
+        while (Current().Type != TokenType::Comma && 
+               Current().Type != TokenType::RightParenthesis &&
+               Current().Type != TokenType::Assign &&
+               Current().Type != TokenType::In &&
+               Current().Type != TokenType::Newline &&
+               Current().Type != TokenType::EndOfFile) {
+            
+            if (Current().Type == TokenType::BitwiseOr) {
+                typeStr += "|";
+                Advance();
+            } else if (IsInSet(Current().Type, IdentifierTypes_) || Current().Type == TokenType::Null) {
+                typeStr += Current().Text;
+                Advance();
+            } else {
+                break;
+            }
+        }
+        
+        // Convert type string to DMValueType flags
+        DMValueType flags = ParseTypeFlags(typeStr);
+        explicitValueType = DMComplexValueType(flags);
+    }
+    
+    // Check for 'in' expression (possible values constraint for verbs)
+    // e.g., "mob/M in world" or "direction in list("north","south")"
+    // Can appear before or after default value
+    if (!possibleValues && Current().Type == TokenType::In) {
+        Advance();
+        possibleValues = Expression();
+    }
+    
     return std::make_unique<DMASTDefinitionParameter>(loc, paramName, typePath, isList,
-                                                      std::move(defaultValue), nullptr, explicitValueType);
+                                                      std::move(defaultValue), std::move(possibleValues), explicitValueType);
 }
 
 // ObjectVarDefinition is no longer used - var blocks are now handled through the object definition path

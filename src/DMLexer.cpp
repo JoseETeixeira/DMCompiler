@@ -53,6 +53,23 @@ Token DMLexer::ParseNextToken() {
     
     char current = GetCurrent();
     
+    // Check if we're inside an interpolated string and hit a closing bracket
+    if (inInterpolatedString_ && current == ']') {
+        stringBracketNesting_--;
+        if (stringBracketNesting_ == 0) {
+            // End of embedded expression, continue parsing the string
+            Advance(); // Skip the ']'
+            return ContinueString();
+        }
+    }
+    
+    // Track bracket nesting for interpolated strings
+    if (inInterpolatedString_) {
+        if (current == '[') {
+            stringBracketNesting_++;
+        }
+    }
+    
     // Skip whitespace (spaces and tabs) - don't emit tokens
     if (current == ' ' || current == '\t') {
         SkipWhitespace();
@@ -210,12 +227,30 @@ Token DMLexer::ParseString() {
     char quote = GetCurrent();
     Advance(); // Skip opening quote
     
+    // If we're already inside an interpolated expression, parse string without interpolation
+    // to avoid nested interpolation complexity
+    bool allowInterpolation = !inInterpolatedString_;
+    
     while (!AtEndOfSource_ && GetCurrent() != quote) {
         if (str.length() > Limits::MAX_STRING_LENGTH) {
             // Stop consuming
             break;
         }
 
+        // Check for embedded expression [...] only if allowed
+        if (allowInterpolation && GetCurrent() == '[') {
+            // Start string interpolation mode
+            inInterpolatedString_ = true;
+            stringQuoteChar_ = quote;
+            stringBracketNesting_ = 1;
+            stringStartLoc_ = startLoc;
+            Advance(); // Skip the '['
+            
+            // Return the string part we've collected so far as StringBegin or StringMiddle
+            Token::TokenValue value(str);
+            return Token(TokenType::DM_Preproc_StringBegin, str, startLoc, value);
+        }
+        
         if (GetCurrent() == '\\' && Peek() != '\0') {
             Advance();
             char escaped = GetCurrent();
@@ -226,6 +261,8 @@ Token DMLexer::ParseString() {
                 case '\\': str += '\\'; break;
                 case '"': str += '"'; break;
                 case '\'': str += '\''; break;
+                case '[': str += '['; break;  // Escaped brackets don't start interpolation
+                case ']': str += ']'; break;
                 default: 
                     // Not a recognized escape sequence, keep the backslash
                     str += '\\';
@@ -243,6 +280,62 @@ Token DMLexer::ParseString() {
     }
     
     return Token(TokenType::String, str, startLoc, Token::TokenValue(str));
+}
+
+Token DMLexer::ContinueString() {
+    // Continue parsing the string after an embedded expression
+    std::string str;
+    Location startLoc = CurrentLocation_;
+    char quote = stringQuoteChar_;
+    
+    while (!AtEndOfSource_ && GetCurrent() != quote) {
+        if (str.length() > Limits::MAX_STRING_LENGTH) {
+            break;
+        }
+
+        // Check for another embedded expression
+        if (GetCurrent() == '[') {
+            stringBracketNesting_ = 1;
+            Advance(); // Skip the '['
+            
+            // Return the middle part
+            Token::TokenValue value(str);
+            return Token(TokenType::DM_Preproc_StringMiddle, str, startLoc, value);
+        }
+        
+        if (GetCurrent() == '\\' && Peek() != '\0') {
+            Advance();
+            char escaped = GetCurrent();
+            switch (escaped) {
+                case 'n': str += '\n'; break;
+                case 't': str += '\t'; break;
+                case 'r': str += '\r'; break;
+                case '\\': str += '\\'; break;
+                case '"': str += '"'; break;
+                case '\'': str += '\''; break;
+                case '[': str += '['; break;
+                case ']': str += ']'; break;
+                default: 
+                    str += '\\';
+                    str += escaped; 
+                    break;
+            }
+        } else {
+            str += GetCurrent();
+        }
+        Advance();
+    }
+    
+    if (!AtEndOfSource_) {
+        Advance(); // Skip closing quote
+    }
+    
+    // End of interpolated string
+    inInterpolatedString_ = false;
+    stringQuoteChar_ = 0;
+    stringBracketNesting_ = 0;
+    
+    return Token(TokenType::DM_Preproc_StringEnd, str, startLoc, Token::TokenValue(str));
 }
 
 Token DMLexer::ParseMultiLineString() {
@@ -366,6 +459,10 @@ Token DMLexer::ParseOperator() {
     if (current == '-' && next == '=') {
         Advance(); Advance();
         return Token(TokenType::MinusAssign, "-=", startLoc);
+    }
+    if (current == '*' && next == '*') {
+        Advance(); Advance();
+        return Token(TokenType::Power, "**", startLoc);
     }
     if (current == '*' && next == '=') {
         Advance(); Advance();

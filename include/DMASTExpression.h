@@ -102,6 +102,27 @@ public:
 };
 
 /// <summary>
+/// Interpolated string with embedded expressions: "Hello [name]!"
+/// Contains alternating string parts and expressions
+/// </summary>
+class DMASTStringFormat : public DMASTExpression {
+public:
+    // String parts (one more than expressions count, or same if string ends with expression)
+    std::vector<std::string> StringParts;
+    // Embedded expressions
+    std::vector<std::unique_ptr<DMASTExpression>> Expressions;
+    
+    DMASTStringFormat(const Location& location,
+                      std::vector<std::string> stringParts,
+                      std::vector<std::unique_ptr<DMASTExpression>> expressions)
+        : DMASTExpression(location)
+        , StringParts(std::move(stringParts))
+        , Expressions(std::move(expressions)) {}
+    
+    bool TryAsJsonRepresentation(DMCompiler* compiler, JsonValue& outJson) override;
+};
+
+/// <summary>
 /// Resource constant ('icon.dmi')
 /// </summary>
 class DMASTConstantResource : public DMASTExpression {

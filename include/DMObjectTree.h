@@ -196,7 +196,8 @@ public:
     /// Add a variable definition to an object
     /// @param owner The object that owns this variable
     /// @param varDef The variable definition from the AST
-    void AddObjectVar(const DreamPath& owner, class DMASTObjectVarDefinition* varDef);
+    /// @param effectiveType Optional type from var block context (overrides varDef's TypePath if set)
+    void AddObjectVar(const DreamPath& owner, class DMASTObjectVarDefinition* varDef, std::optional<DreamPath> effectiveType = std::nullopt);
     
     /// Add a variable override to an object
     /// @param owner The object that owns this variable

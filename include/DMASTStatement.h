@@ -245,6 +245,25 @@ public:
 };
 
 /// <summary>
+/// For-range loop statement (for(var/x = start to end) or for(var/x = start to end step inc))
+/// </summary>
+class DMASTProcStatementForRange : public DMASTProcStatement {
+public:
+    std::unique_ptr<DMASTExpression> Initializer;  // The initializer expression (var/x = start)
+    std::unique_ptr<DMASTExpression> End;          // Ending value
+    std::unique_ptr<DMASTExpression> Step;         // Optional step value (nullptr means step of 1)
+    std::unique_ptr<DMASTProcBlockInner> Body;
+    
+    DMASTProcStatementForRange(const Location& location,
+                              std::unique_ptr<DMASTExpression> initializer,
+                              std::unique_ptr<DMASTExpression> end,
+                              std::unique_ptr<DMASTExpression> step,
+                              std::unique_ptr<DMASTProcBlockInner> body)
+        : DMASTProcStatement(location), Initializer(std::move(initializer)),
+          End(std::move(end)), Step(std::move(step)), Body(std::move(body)) {}
+};
+
+/// <summary>
 /// While loop statement
 /// </summary>
 class DMASTProcStatementWhile : public DMASTProcStatement {

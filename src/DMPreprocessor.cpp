@@ -14,7 +14,7 @@ namespace DMCompiler {
 // DMMacro Implementations
 // ============================================================================
 
-std::vector<Token> DMMacroFunction::Expand(const std::vector<Token>& arguments, const Location& location) {
+std::vector<Token> DMMacroFunction::Expand(const std::vector<std::vector<Token>>& arguments, const Location& location) {
     if (arguments.size() != Parameters.size()) {
         std::cerr << "Error at " << location.ToString() << ": Macro expansion failed - expected " 
                   << Parameters.size() << " arguments but got " << arguments.size() << std::endl;
@@ -24,10 +24,9 @@ std::vector<Token> DMMacroFunction::Expand(const std::vector<Token>& arguments, 
     std::vector<Token> result;
     std::unordered_map<std::string, std::vector<Token>> argMap;
     
-    // Map parameter names to argument tokens
+    // Map parameter names to argument token vectors
     for (size_t i = 0; i < Parameters.size(); ++i) {
-        // Each argument is actually a vector of tokens (for now, simplify to single token)
-        argMap[Parameters[i]] = {arguments[i]};
+        argMap[Parameters[i]] = arguments[i];
     }
     
     // Replace parameters in token stream
@@ -35,7 +34,7 @@ std::vector<Token> DMMacroFunction::Expand(const std::vector<Token>& arguments, 
         if (token.Type == TokenType::Identifier) {
             auto it = argMap.find(token.Text);
             if (it != argMap.end()) {
-                // Replace with argument tokens
+                // Replace with argument tokens (preserving all tokens in multi-token args)
                 for (const auto& argToken : it->second) {
                     result.push_back(argToken);
                 }
@@ -48,28 +47,28 @@ std::vector<Token> DMMacroFunction::Expand(const std::vector<Token>& arguments, 
     return result;
 }
 
-std::vector<Token> DMMacroLine::Expand(const std::vector<Token>& arguments, const Location& location) {
+std::vector<Token> DMMacroLine::Expand(const std::vector<std::vector<Token>>& arguments, const Location& location) {
     std::vector<Token> result;
     Token::TokenValue value(static_cast<int64_t>(location.Line));
     result.push_back(Token(TokenType::Number, std::to_string(location.Line), location, value));
     return result;
 }
 
-std::vector<Token> DMMacroFile::Expand(const std::vector<Token>& arguments, const Location& location) {
+std::vector<Token> DMMacroFile::Expand(const std::vector<std::vector<Token>>& arguments, const Location& location) {
     std::vector<Token> result;
     Token::TokenValue value(location.SourceFile);
     result.push_back(Token(TokenType::String, location.SourceFile, location, value));
     return result;
 }
 
-std::vector<Token> DMMacroVersion::Expand(const std::vector<Token>& arguments, const Location& location) {
+std::vector<Token> DMMacroVersion::Expand(const std::vector<std::vector<Token>>& arguments, const Location& location) {
     std::vector<Token> result;
     Token::TokenValue value(static_cast<int64_t>(515)); // Default DM version
     result.push_back(Token(TokenType::Number, "515", location, value));
     return result;
 }
 
-std::vector<Token> DMMacroBuild::Expand(const std::vector<Token>& arguments, const Location& location) {
+std::vector<Token> DMMacroBuild::Expand(const std::vector<std::vector<Token>>& arguments, const Location& location) {
     std::vector<Token> result;
     Token::TokenValue value(static_cast<int64_t>(1630)); // Default build number
     result.push_back(Token(TokenType::Number, "1630", location, value));
@@ -84,6 +83,7 @@ DMPreprocessor::DMPreprocessor(DMCompiler* compiler)
     : Compiler_(compiler)
     , CanUseDirective_(true)
     , CurrentLineContainsNonWhitespace_(false)
+    , PreviousNonWhitespaceToken_(TokenType::EndOfFile)
 {
     // Add built-in macros
     Defines_["__LINE__"] = std::make_unique<DMMacroLine>();
@@ -129,6 +129,7 @@ bool DMPreprocessor::Initialize(const std::string& rootFilePath) {
     
     CanUseDirective_ = true;
     CurrentLineContainsNonWhitespace_ = false;
+    PreviousNonWhitespaceToken_ = TokenType::EndOfFile;
     
     // Push root file onto stack
     return PushFile(rootFilePath, Location::Internal);
@@ -176,6 +177,42 @@ bool DMPreprocessor::PushFile(const std::string& filePath, const Location& inclu
     std::stringstream buffer;
     buffer << file.rdbuf();
     std::string content = buffer.str();
+    
+    // Handle line continuation: backslash at end of line joins with next line
+    // This needs to be done before lexing
+    // We need to handle: \<newline>, \<CRLF>, and \ followed by optional whitespace then newline
+    // Replace the entire continuation sequence with a single space to join lines
+    std::string processedContent;
+    processedContent.reserve(content.size());
+    for (size_t i = 0; i < content.size(); ++i) {
+        if (content[i] == '\\') {
+            // Check if this backslash is followed by optional whitespace then newline
+            size_t j = i + 1;
+            // Skip any spaces or tabs (but not other whitespace)
+            while (j < content.size() && (content[j] == ' ' || content[j] == '\t')) {
+                ++j;
+            }
+            // Now check for newline
+            if (j < content.size()) {
+                if (content[j] == '\n') {
+                    // Line continuation: replace everything with a single space
+                    processedContent.push_back(' ');
+                    i = j;  // Skip past newline (loop will increment)
+                    continue;
+                } else if (content[j] == '\r') {
+                    // Check for CRLF
+                    if (j + 1 < content.size() && content[j + 1] == '\n') {
+                        // Replace with single space
+                        processedContent.push_back(' ');
+                        i = j + 1;  // Skip past CRLF
+                        continue;
+                    }
+                }
+            }
+        }
+        processedContent.push_back(content[i]);
+    }
+    content = std::move(processedContent);
     
     // Calculate include depth
     int depth = static_cast<int>(FileStack_.size());
@@ -353,6 +390,11 @@ Token DMPreprocessor::GetNextToken() {
         if (!UnprocessedTokens_.empty()) {
             Token token = UnprocessedTokens_.top();
             UnprocessedTokens_.pop();
+            // Update previous token tracking for non-whitespace tokens
+            if (token.Type != TokenType::DM_Preproc_Whitespace && 
+                token.Type != TokenType::Newline) {
+                PreviousNonWhitespaceToken_ = token.Type;
+            }
             return token;
         }
         
@@ -376,6 +418,7 @@ Token DMPreprocessor::GetNextToken() {
         // Handle newline tokens with line state management
         if (token.Type == TokenType::Newline) {
             CanUseDirective_ = true;
+            PreviousNonWhitespaceToken_ = TokenType::Newline; // Reset on newline
             if (CurrentLineContainsNonWhitespace_) {
                 BufferedWhitespace_ = std::stack<Token>(); // Clear buffered whitespace
                 CurrentLineContainsNonWhitespace_ = false;
@@ -473,6 +516,7 @@ Token DMPreprocessor::GetNextToken() {
             }
             
             CurrentLineContainsNonWhitespace_ = true;
+            PreviousNonWhitespaceToken_ = token.Type;
             return token;
         }
         
@@ -486,6 +530,7 @@ Token DMPreprocessor::GetNextToken() {
         }
         
         CurrentLineContainsNonWhitespace_ = true;
+        PreviousNonWhitespaceToken_ = token.Type;
         return token;
     }
 }
@@ -502,6 +547,14 @@ void DMPreprocessor::PushTokens(std::vector<Token>&& tokens) {
 }
 
 bool DMPreprocessor::TryExpandMacro(const Token& token) {
+    // Don't expand macros when in a path context (previous token was / or .)
+    // This prevents expansion in proc/MACRO(params), /datum/MACRO, etc.
+    if (PreviousNonWhitespaceToken_ == TokenType::Divide ||
+        PreviousNonWhitespaceToken_ == TokenType::Period ||
+        PreviousNonWhitespaceToken_ == TokenType::DM_Preproc_Punctuator_Period) {
+        return false;
+    }
+    
     auto it = Defines_.find(token.Text);
     if (it == Defines_.end()) {
         return false;
@@ -509,8 +562,8 @@ bool DMPreprocessor::TryExpandMacro(const Token& token) {
     
     std::vector<Token> expandedTokens;
     if (it->second->HasParameters()) {
-        // Function-like macro - read arguments
-        std::vector<Token> arguments = ReadMacroArguments();
+        // Function-like macro - read arguments (now returns vector of token vectors)
+        std::vector<std::vector<Token>> arguments = ReadMacroArguments();
         expandedTokens = it->second->Expand(arguments, token.Loc);
     } else {
         // Simple macro
@@ -521,8 +574,8 @@ bool DMPreprocessor::TryExpandMacro(const Token& token) {
     return true;
 }
 
-std::vector<Token> DMPreprocessor::ReadMacroArguments() {
-    std::vector<Token> arguments;
+std::vector<std::vector<Token>> DMPreprocessor::ReadMacroArguments() {
+    std::vector<std::vector<Token>> arguments;
     
     // Expect opening parenthesis
     Token token = GetNextToken();
@@ -530,7 +583,9 @@ std::vector<Token> DMPreprocessor::ReadMacroArguments() {
         token = GetNextToken();
     }
     
-    if (token.Type != TokenType::DM_Preproc_Punctuator_LeftParenthesis) {
+    // Accept both preprocessor and regular token types for '('
+    if (token.Type != TokenType::DM_Preproc_Punctuator_LeftParenthesis &&
+        token.Type != TokenType::LeftParenthesis) {
         PushToken(std::move(token));
         return arguments; // No arguments
     }
@@ -549,11 +604,13 @@ std::vector<Token> DMPreprocessor::ReadMacroArguments() {
             break;
         }
         
-        // Track parenthesis depth for nested calls
-        if (token.Type == TokenType::DM_Preproc_Punctuator_LeftParenthesis) {
+        // Track parenthesis depth for nested calls - accept both token types
+        if (token.Type == TokenType::DM_Preproc_Punctuator_LeftParenthesis ||
+            token.Type == TokenType::LeftParenthesis) {
             parenDepth++;
             currentArg.push_back(token);
-        } else if (token.Type == TokenType::DM_Preproc_Punctuator_RightParenthesis) {
+        } else if (token.Type == TokenType::DM_Preproc_Punctuator_RightParenthesis ||
+                   token.Type == TokenType::RightParenthesis) {
             if (parenDepth == 0) {
                 // End of arguments
                 if (!currentArg.empty() || !arguments.empty()) {
@@ -564,13 +621,19 @@ std::vector<Token> DMPreprocessor::ReadMacroArguments() {
                     while (!currentArg.empty() && currentArg.back().Type == TokenType::DM_Preproc_Whitespace) {
                         currentArg.pop_back();
                     }
-                    arguments.push_back(Token(TokenType::EndOfFile, "", token.Loc, Token::TokenValue())); // Placeholder
+                    // Keep all tokens for the argument (don't concatenate!)
+                    if (!currentArg.empty()) {
+                        arguments.push_back(std::move(currentArg));
+                    } else if (!arguments.empty()) {
+                        // Empty argument after comma - push empty vector
+                        arguments.push_back({});
+                    }
                 }
                 break;
             }
             parenDepth--;
             currentArg.push_back(token);
-        } else if (token.Type == TokenType::DM_Preproc_Punctuator_Comma && parenDepth == 0) {
+        } else if ((token.Type == TokenType::DM_Preproc_Punctuator_Comma || token.Type == TokenType::Comma) && parenDepth == 0) {
             // Argument separator
             // Trim leading/trailing whitespace from current arg
             while (!currentArg.empty() && currentArg.front().Type == TokenType::DM_Preproc_Whitespace) {
@@ -579,7 +642,8 @@ std::vector<Token> DMPreprocessor::ReadMacroArguments() {
             while (!currentArg.empty() && currentArg.back().Type == TokenType::DM_Preproc_Whitespace) {
                 currentArg.pop_back();
             }
-            arguments.push_back(Token(TokenType::EndOfFile, "", token.Loc, Token::TokenValue())); // Placeholder
+            // Keep all tokens for the argument (don't concatenate!)
+            arguments.push_back(std::move(currentArg));
             currentArg.clear();
         } else {
             currentArg.push_back(token);
@@ -685,6 +749,42 @@ std::vector<Token> DMPreprocessor::PreprocessFile(const std::string& path, const
     std::stringstream buffer;
     buffer << file.rdbuf();
     std::string content = buffer.str();
+    
+    // Handle line continuation: backslash at end of line joins with next line
+    // This needs to be done before lexing
+    // We need to handle: \<newline>, \<CRLF>, and \ followed by optional whitespace then newline
+    // Replace the entire continuation sequence with a single space to join lines
+    std::string processedContent;
+    processedContent.reserve(content.size());
+    for (size_t i = 0; i < content.size(); ++i) {
+        if (content[i] == '\\') {
+            // Check if this backslash is followed by optional whitespace then newline
+            size_t j = i + 1;
+            // Skip any spaces or tabs (but not other whitespace)
+            while (j < content.size() && (content[j] == ' ' || content[j] == '\t')) {
+                ++j;
+            }
+            // Now check for newline
+            if (j < content.size()) {
+                if (content[j] == '\n') {
+                    // Line continuation: replace everything with a single space
+                    processedContent.push_back(' ');
+                    i = j;  // Skip past newline (loop will increment)
+                    continue;
+                } else if (content[j] == '\r') {
+                    // Check for CRLF
+                    if (j + 1 < content.size() && content[j + 1] == '\n') {
+                        // Replace with single space
+                        processedContent.push_back(' ');
+                        i = j + 1;  // Skip past CRLF
+                        continue;
+                    }
+                }
+            }
+        }
+        processedContent.push_back(content[i]);
+    }
+    content = std::move(processedContent);
     
     // Mark as included BEFORE processing to prevent circular includes
     IncludedFiles_.insert(absolutePath);
@@ -947,11 +1047,13 @@ void DMPreprocessor::HandleIncludeDirective(const Token& token) {
 }
 
 void DMPreprocessor::HandleDefineDirective(const Token& token) {
-    Token defineIdentifier = GetNextToken();
+    // Use GetNextRawToken() throughout to avoid recursive preprocessing
+    // Macro definitions should read raw tokens, not preprocessed tokens
+    Token defineIdentifier = GetNextRawToken();
     
     // Skip whitespace
     while (defineIdentifier.Type == TokenType::DM_Preproc_Whitespace) {
-        defineIdentifier = GetNextToken();
+        defineIdentifier = GetNextRawToken();
     }
     
     // Accept both DM_Preproc_Identifier and regular Identifier tokens
@@ -967,11 +1069,11 @@ void DMPreprocessor::HandleDefineDirective(const Token& token) {
     
     // Handle FILE_DIR specially
     if (macroName == "FILE_DIR") {
-        Token dirToken = GetNextToken();
+        Token dirToken = GetNextRawToken();
         
         // Skip whitespace
         while (dirToken.Type == TokenType::DM_Preproc_Whitespace) {
-            dirToken = GetNextToken();
+            dirToken = GetNextRawToken();
         }
         
         std::string dirValue;
@@ -1017,25 +1119,29 @@ void DMPreprocessor::HandleDefineDirective(const Token& token) {
     }
     
     // Check for function-like macro
-    Token nextToken = GetNextToken();
+    Token nextToken = GetNextRawToken();
     
     std::vector<std::string> parameters;
     bool isFunctionMacro = false;
     bool foundVariadic = false;
     
-    if (nextToken.Type == TokenType::DM_Preproc_Punctuator_LeftParenthesis) {
+    // Check for '(' - accept both preprocessor and regular token types
+    if (nextToken.Type == TokenType::DM_Preproc_Punctuator_LeftParenthesis ||
+        nextToken.Type == TokenType::LeftParenthesis) {
         // Function-like macro
         isFunctionMacro = true;
         
         while (true) {
-            Token paramToken = GetNextToken();
+            Token paramToken = GetNextRawToken();
             
             // Skip whitespace
             while (paramToken.Type == TokenType::DM_Preproc_Whitespace) {
-                paramToken = GetNextToken();
+                paramToken = GetNextRawToken();
             }
             
-            if (paramToken.Type == TokenType::DM_Preproc_Punctuator_RightParenthesis) {
+            // Check for ')' - accept both token types
+            if (paramToken.Type == TokenType::DM_Preproc_Punctuator_RightParenthesis ||
+                paramToken.Type == TokenType::RightParenthesis) {
                 break;
             }
             
@@ -1043,25 +1149,25 @@ void DMPreprocessor::HandleDefineDirective(const Token& token) {
                 std::string paramName = paramToken.Text;
                 
                 // Check for variadic parameter (...)
-                Token peek = GetNextToken();
+                Token peek = GetNextRawToken();
                 while (peek.Type == TokenType::DM_Preproc_Whitespace) {
-                    peek = GetNextToken();
+                    peek = GetNextRawToken();
                 }
                 
-                if (peek.Type == TokenType::DM_Preproc_Punctuator_Period) {
+                if (peek.Type == TokenType::DM_Preproc_Punctuator_Period || peek.Type == TokenType::Period) {
                     // Check for ... (three dots)
-                    Token dot2 = GetNextToken();
-                    Token dot3 = GetNextToken();
+                    Token dot2 = GetNextRawToken();
+                    Token dot3 = GetNextRawToken();
                     
-                    if (dot2.Type == TokenType::DM_Preproc_Punctuator_Period && 
-                        dot3.Type == TokenType::DM_Preproc_Punctuator_Period) {
+                    if ((dot2.Type == TokenType::DM_Preproc_Punctuator_Period || dot2.Type == TokenType::Period) && 
+                        (dot3.Type == TokenType::DM_Preproc_Punctuator_Period || dot3.Type == TokenType::Period)) {
                         paramName += "...";
                         foundVariadic = true;
                         
                         // Next token should be comma or right paren
-                        peek = GetNextToken();
+                        peek = GetNextRawToken();
                         while (peek.Type == TokenType::DM_Preproc_Whitespace) {
-                            peek = GetNextToken();
+                            peek = GetNextRawToken();
                         }
                     } else {
                         if (Compiler_) {
@@ -1082,9 +1188,12 @@ void DMPreprocessor::HandleDefineDirective(const Token& token) {
                 parameters.push_back(paramName);
                 
                 // peek already has the next token (comma or right paren)
-                if (peek.Type == TokenType::DM_Preproc_Punctuator_RightParenthesis) {
+                // Accept both token types for ')' and ','
+                if (peek.Type == TokenType::DM_Preproc_Punctuator_RightParenthesis ||
+                    peek.Type == TokenType::RightParenthesis) {
                     break;
-                } else if (peek.Type != TokenType::DM_Preproc_Punctuator_Comma) {
+                } else if (peek.Type != TokenType::DM_Preproc_Punctuator_Comma &&
+                           peek.Type != TokenType::Comma) {
                     if (Compiler_) {
                         Compiler_->ForcedError(peek.Loc, "Expected ',' or ')' in macro parameter list");
                     }
@@ -1098,19 +1207,21 @@ void DMPreprocessor::HandleDefineDirective(const Token& token) {
             }
         }
         
-        nextToken = GetNextToken();
+        nextToken = GetNextRawToken();
     }
     
     // Skip whitespace before macro body
     while (nextToken.Type == TokenType::DM_Preproc_Whitespace) {
-        nextToken = GetNextToken();
+        nextToken = GetNextRawToken();
     }
     
     // Read macro body tokens until newline
+    // Use GetNextRawToken() to read raw tokens without preprocessing
+    // This avoids recursive processing and stores raw tokens for later expansion
     std::vector<Token> macroBodyTokens;
     while (nextToken.Type != TokenType::Newline && nextToken.Type != TokenType::EndOfFile) {
         macroBodyTokens.push_back(nextToken);
-        nextToken = GetNextToken();
+        nextToken = GetNextRawToken();
     }
     
     // Remove trailing whitespace tokens from body
@@ -1127,11 +1238,12 @@ void DMPreprocessor::HandleDefineDirective(const Token& token) {
 }
 
 void DMPreprocessor::HandleUndefineDirective(const Token& token) {
-    Token defineIdentifier = GetNextToken();
+    // Use raw tokens for consistency with other directive handling
+    Token defineIdentifier = GetNextRawToken();
     
     // Skip whitespace
     while (defineIdentifier.Type == TokenType::DM_Preproc_Whitespace) {
-        defineIdentifier = GetNextToken();
+        defineIdentifier = GetNextRawToken();
     }
     
     if (defineIdentifier.Type != TokenType::DM_Preproc_Identifier && 

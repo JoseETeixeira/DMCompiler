@@ -3,6 +3,7 @@
 #include "DreamPath.h"
 #include "Location.h"
 #include <memory>
+#include <optional>
 #include <string>
 
 namespace DMCompiler {
@@ -49,6 +50,11 @@ private:
     /// Processes a single statement and adds it to the object tree
     /// </summary>
     void ProcessStatement(DMASTStatement* statement, const DreamPath& currentType);
+    
+    /// <summary>
+    /// Processes a single statement with var block context tracking
+    /// </summary>
+    void ProcessStatementWithVarContext(DMASTStatement* statement, const DreamPath& currentType, std::optional<DreamPath> varBlockType);
 };
 
 } // namespace DMCompiler

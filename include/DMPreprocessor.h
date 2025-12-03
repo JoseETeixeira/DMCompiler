@@ -21,7 +21,8 @@ class DMLexer;
 class DMMacro {
 public:
     virtual ~DMMacro() = default;
-    virtual std::vector<Token> Expand(const std::vector<Token>& arguments, const Location& location) = 0;
+    // Each argument is now a vector of tokens to support multi-token arguments like "++ x"
+    virtual std::vector<Token> Expand(const std::vector<std::vector<Token>>& arguments, const Location& location) = 0;
     virtual bool HasParameters() const { return false; }
 };
 
@@ -34,7 +35,7 @@ public:
     
     explicit DMMacroText(const std::vector<Token>& tokens) : Tokens(tokens) {}
     
-    std::vector<Token> Expand(const std::vector<Token>& arguments, const Location& location) override {
+    std::vector<Token> Expand(const std::vector<std::vector<Token>>& arguments, const Location& location) override {
         return Tokens;
     }
 };
@@ -52,7 +53,7 @@ public:
     
     bool HasParameters() const override { return true; }
     
-    std::vector<Token> Expand(const std::vector<Token>& arguments, const Location& location) override;
+    std::vector<Token> Expand(const std::vector<std::vector<Token>>& arguments, const Location& location) override;
 };
 
 /// <summary>
@@ -60,7 +61,7 @@ public:
 /// </summary>
 class DMMacroLine : public DMMacro {
 public:
-    std::vector<Token> Expand(const std::vector<Token>& arguments, const Location& location) override;
+    std::vector<Token> Expand(const std::vector<std::vector<Token>>& arguments, const Location& location) override;
 };
 
 /// <summary>
@@ -68,7 +69,7 @@ public:
 /// </summary>
 class DMMacroFile : public DMMacro {
 public:
-    std::vector<Token> Expand(const std::vector<Token>& arguments, const Location& location) override;
+    std::vector<Token> Expand(const std::vector<std::vector<Token>>& arguments, const Location& location) override;
 };
 
 /// <summary>
@@ -76,7 +77,7 @@ public:
 /// </summary>
 class DMMacroVersion : public DMMacro {
 public:
-    std::vector<Token> Expand(const std::vector<Token>& arguments, const Location& location) override;
+    std::vector<Token> Expand(const std::vector<std::vector<Token>>& arguments, const Location& location) override;
 };
 
 /// <summary>
@@ -84,7 +85,7 @@ public:
 /// </summary>
 class DMMacroBuild : public DMMacro {
 public:
-    std::vector<Token> Expand(const std::vector<Token>& arguments, const Location& location) override;
+    std::vector<Token> Expand(const std::vector<std::vector<Token>>& arguments, const Location& location) override;
 };
 
 /// <summary>
@@ -195,6 +196,7 @@ private:
     std::stack<bool> LastIfEvaluations_;
     bool CanUseDirective_;
     bool CurrentLineContainsNonWhitespace_;
+    TokenType PreviousNonWhitespaceToken_; // Track previous token for path context detection
     
     // Token processing (GetNextToken is now public for streaming interface)
     void PushToken(Token&& token);
@@ -226,7 +228,7 @@ private:
     
     // Macro handling
     bool TryExpandMacro(const Token& token);
-    std::vector<Token> ReadMacroArguments();
+    std::vector<std::vector<Token>> ReadMacroArguments();
     
     // Conditional evaluation
     bool EvaluateCondition(const std::vector<Token>& tokens);

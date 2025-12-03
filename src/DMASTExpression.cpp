@@ -40,6 +40,17 @@ bool DMASTConstantString::TryAsJsonRepresentation(DMCompiler* compiler, JsonValu
     return true;
 }
 
+// DMASTStringFormat
+bool DMASTStringFormat::TryAsJsonRepresentation(DMCompiler* compiler, JsonValue& outJson) {
+    // String format with embedded expressions - for now, just return a placeholder
+    // Full support would require extending JsonValue to support arrays/objects
+    std::string result = "[string format: ";
+    result += std::to_string(StringParts.size()) + " parts, ";
+    result += std::to_string(Expressions.size()) + " expressions]";
+    outJson = result;
+    return true;
+}
+
 // DMASTConstantResource
 bool DMASTConstantResource::TryAsJsonRepresentation(DMCompiler* compiler, JsonValue& outJson) {
     // Resources are serialized as their path string

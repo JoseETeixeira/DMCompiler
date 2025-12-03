@@ -41,10 +41,10 @@ LocalConstVariable::LocalConstVariable(
     std::string name,
     int id,
     std::optional<DreamPath> type,
-    void* value
+    Constant value
 )
     : LocalVariable(std::move(name), id, false, type, std::nullopt)
-    , ConstValue(value)
+    , ConstValue(std::move(value))
 {
 }
 
@@ -127,7 +127,7 @@ LocalVariable* DMProc::AddLocalVariable(
 LocalConstVariable* DMProc::AddLocalConst(
     const std::string& name,
     std::optional<DreamPath> type,
-    void* value
+    Constant value
 ) {
     // Check if already exists
     if (LocalVariables.find(name) != LocalVariables.end()) {
@@ -139,7 +139,7 @@ LocalConstVariable* DMProc::AddLocalConst(
         name,
         LocalVariableIdCounter_++,
         type,
-        value
+        std::move(value)
     );
     
     auto* varPtr = var.get();
@@ -336,11 +336,18 @@ void DMProc::Compile(DMCompiler* compiler) {
                 continue;  // No initialization needed
             }
             
+            // Set expected type for bare 'new' inference
+            exprCompiler.SetExpectedType(variable.Type);
+            
             // Compile the initializer expression (pushes value onto stack)
             if (!exprCompiler.CompileExpression(variable.Value)) {
+                exprCompiler.SetExpectedType(std::nullopt);
                 compiler->ForcedWarning("Failed to compile initializer for variable '" + varName + "'");
                 continue;
             }
+            
+            // Clear expected type after compilation
+            exprCompiler.SetExpectedType(std::nullopt);
             
             // Emit assignment to src.varName
             // We need to assign to the instance variable on src
@@ -363,11 +370,18 @@ void DMProc::Compile(DMCompiler* compiler) {
                 continue;  // No initialization needed
             }
             
+            // Set expected type for bare 'new' inference
+            exprCompiler.SetExpectedType(variable.Type);
+            
             // Compile the initializer expression (pushes value onto stack)
             if (!exprCompiler.CompileExpression(variable.Value)) {
+                exprCompiler.SetExpectedType(std::nullopt);
                 compiler->ForcedWarning("Failed to compile initializer for variable override '" + varName + "'");
                 continue;
             }
+            
+            // Clear expected type after compilation
+            exprCompiler.SetExpectedType(std::nullopt);
             
             // Emit assignment to src.varName
             DMObjectTree* objectTree = compiler->GetObjectTree();

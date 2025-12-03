@@ -553,14 +553,35 @@ bool DMCompiler::ProcessVarDefinition(DMASTObjectVarDefinition* varDef, const Dr
     }
     
     // Remove "var" from currentPath if present to get the actual object path
+    // Also handle nested type paths like /global/var/list/tolog where:
+    // - "global" is the owner scope
+    // - "var" is the keyword
+    // - "list" is the type
+    // - varDef->Name is "tolog"
     std::vector<std::string> objectPathElements = currentPath.GetElements();
-    for (auto it = objectPathElements.begin(); it != objectPathElements.end(); ++it) {
+    std::vector<std::string> typeFromPath; // Type elements extracted from the path
+    bool foundVar = false;
+    
+    for (auto it = objectPathElements.begin(); it != objectPathElements.end(); ) {
         if (*it == "var") {
-            objectPathElements.erase(it);
+            foundVar = true;
+            it = objectPathElements.erase(it);
             if (Settings_.Verbose) {
                 std::cout << "    Removed 'var' from object path" << std::endl;
             }
-            break;
+        } else if (foundVar) {
+            // Everything after "var" (except the owner) is part of the type
+            // But we need to check if this is a global context first
+            if (objectPathElements.size() > 0 && objectPathElements[0] == "global") {
+                // In global context, everything after global goes to type
+                typeFromPath.push_back(*it);
+                it = objectPathElements.erase(it);
+            } else {
+                // Not global, keep the path element
+                ++it;
+            }
+        } else {
+            ++it;
         }
     }
     
@@ -575,6 +596,21 @@ bool DMCompiler::ProcessVarDefinition(DMASTObjectVarDefinition* varDef, const Dr
         std::cout << "    Parsing modifiers from: " << varDef->TypePath.Path.ToString() << std::endl;
     }
     VarModifiers mods = VarModifiers::Parse(varDef->TypePath.Path);
+    
+    // If we extracted type elements from the path, merge them with mods.TypePath
+    if (!typeFromPath.empty()) {
+        if (mods.TypePath) {
+            // Combine: typeFromPath + mods.TypePath
+            std::vector<std::string> combined = typeFromPath;
+            for (const auto& elem : mods.TypePath->GetElements()) {
+                combined.push_back(elem);
+            }
+            mods.TypePath = DreamPath(DreamPath::PathType::Absolute, combined);
+        } else {
+            mods.TypePath = DreamPath(DreamPath::PathType::Absolute, typeFromPath);
+        }
+    }
+    
     if (Settings_.Verbose) {
         std::cout << "    Parsed modifiers: IsConst=" << mods.IsConst 
                   << ", IsGlobal=" << mods.IsGlobal 

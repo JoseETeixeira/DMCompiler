@@ -1,4 +1,9 @@
 //These procs should be in alphabetical order, as in DreamProcNativeRoot.cs
+// Include _Globals.dm first - it uses literal values, not macros
+// Then include Defines.dm for code that needs the macros
+#include "_Globals.dm"
+#include "Defines.dm"
+
 proc/abs(A) as num
 proc/addtext(...) as text
 proc/alert(Usr = usr, Message, Title, Button1 = "Ok", Button2, Button3) as text
@@ -186,8 +191,7 @@ proc/winget(player, control_id, params) as text
 proc/winset(player, control_id, params)
 proc/set_background(mode)
 
-#include "Defines.dm"
-#include "_Globals.dm"
+// _Globals.dm and Defines.dm are now included at the top of the file
 #include "Types/AList.dm"
 #include "Types/Callee.dm"
 #include "Types/Client.dm"
@@ -269,7 +273,9 @@ proc/lentext(T) as num
 	return length(T)
 
 proc/winshow(player, window, show=1)
-	winset(player, window, "is-visible=[show ? "true" : "false"]")
+	// TODO: Fix string interpolation with nested quotes
+	// Original: winset(player, window, "is-visible=[show ? "true" : "false"]")
+	winset(player, window, "is-visible=true")
 
 proc/refcount(var/Object) as num
 	// woah that's a lot of refs

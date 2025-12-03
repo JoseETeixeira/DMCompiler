@@ -389,7 +389,7 @@ void DMObjectTree::AddType(const DreamPath& path) {
     GetOrCreateDMObject(path);
 }
 
-void DMObjectTree::AddObjectVar(const DreamPath& owner, DMASTObjectVarDefinition* varDef) {
+void DMObjectTree::AddObjectVar(const DreamPath& owner, DMASTObjectVarDefinition* varDef, std::optional<DreamPath> effectiveType) {
     if (!varDef) return;
     
     // Get or create the owning object
@@ -403,11 +403,13 @@ void DMObjectTree::AddObjectVar(const DreamPath& owner, DMASTObjectVarDefinition
     DMVariable var;
     var.Name = varDef->Name;
     
-    // Use the parsed type path (without modifiers), or the original if no modifiers found
-    if (mods.TypePath.has_value()) {
+    // Use effectiveType if provided (from var block context), otherwise use parsed type path
+    if (effectiveType.has_value() && !effectiveType->GetElements().empty()) {
+        var.Type = effectiveType;
+    } else if (mods.TypePath.has_value()) {
         var.Type = mods.TypePath;
     } else {
-        // No type constraint after removing modifiers
+        // No type constraint
         var.Type = std::nullopt;
     }
     

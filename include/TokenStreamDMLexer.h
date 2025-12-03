@@ -109,11 +109,16 @@ protected:
         }
         
         // Handle brackets for nesting tracking
+        // Accept both preprocessor token types and regular token types
         if (preprocToken.Type == TokenType::DM_Preproc_Punctuator_LeftParenthesis ||
-            preprocToken.Type == TokenType::DM_Preproc_Punctuator_LeftBracket) {
+            preprocToken.Type == TokenType::DM_Preproc_Punctuator_LeftBracket ||
+            preprocToken.Type == TokenType::LeftParenthesis ||
+            preprocToken.Type == TokenType::LeftBracket) {
             BracketNesting_++;
         } else if (preprocToken.Type == TokenType::DM_Preproc_Punctuator_RightParenthesis ||
-                   preprocToken.Type == TokenType::DM_Preproc_Punctuator_RightBracket) {
+                   preprocToken.Type == TokenType::DM_Preproc_Punctuator_RightBracket ||
+                   preprocToken.Type == TokenType::RightParenthesis ||
+                   preprocToken.Type == TokenType::RightBracket) {
             BracketNesting_ = std::max(BracketNesting_ - 1, 0);
         }
         
