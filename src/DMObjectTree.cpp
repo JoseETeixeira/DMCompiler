@@ -396,16 +396,23 @@ void DMObjectTree::AddObjectVar(const DreamPath& owner, DMASTObjectVarDefinition
     DMObject* ownerObj = GetOrCreateDMObject(owner);
     
     // Parse variable modifiers from the type path
-    // In DM, variable paths can contain modifiers like var/const/mob/myvar
+    // In DM, variable paths can contain modifiers like var/const/mob/myvar or tmp/squad/squad
+    // We need to parse modifiers from both the AST type path AND the effective type
     VarModifiers mods = VarModifiers::Parse(varDef->TypePath.Path);
+    
+    // Also parse modifiers from effectiveType if it contains modifiers like tmp
+    VarModifiers effectiveMods;
+    if (effectiveType.has_value()) {
+        effectiveMods = VarModifiers::Parse(*effectiveType);
+    }
     
     // Create a DMVariable from the AST definition
     DMVariable var;
     var.Name = varDef->Name;
     
-    // Use effectiveType if provided (from var block context), otherwise use parsed type path
-    if (effectiveType.has_value() && !effectiveType->GetElements().empty()) {
-        var.Type = effectiveType;
+    // Use the parsed type from effectiveType if available, otherwise from AST type path
+    if (effectiveMods.TypePath.has_value() && !effectiveMods.TypePath->GetElements().empty()) {
+        var.Type = effectiveMods.TypePath;
     } else if (mods.TypePath.has_value()) {
         var.Type = mods.TypePath;
     } else {
@@ -413,11 +420,11 @@ void DMObjectTree::AddObjectVar(const DreamPath& owner, DMASTObjectVarDefinition
         var.Type = std::nullopt;
     }
     
-    // Apply extracted modifiers
-    var.IsConst = mods.IsConst;
-    var.IsFinal = mods.IsFinal;
-    var.IsGlobal = mods.IsGlobal || mods.IsStatic;  // Object variables can be global/static
-    var.IsTmp = mods.IsTmp;
+    // Apply extracted modifiers (merge from both sources)
+    var.IsConst = mods.IsConst || effectiveMods.IsConst;
+    var.IsFinal = mods.IsFinal || effectiveMods.IsFinal;
+    var.IsGlobal = mods.IsGlobal || mods.IsStatic || effectiveMods.IsGlobal || effectiveMods.IsStatic;
+    var.IsTmp = mods.IsTmp || effectiveMods.IsTmp;
     var.Value = varDef->Value.get();  // Store pointer to AST expression (non-owning)
     
     // Set explicit value type from "as" clause if present

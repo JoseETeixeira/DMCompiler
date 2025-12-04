@@ -2899,7 +2899,10 @@ std::unique_ptr<DMASTObjectStatement> DMParser::ObjectStatement() {
     //   identifier\n...  -> object definition
     if (IsInSet(Current().Type, IdentifierTypes_) || 
         Current().Type == TokenType::Var ||
-        Current().Type == TokenType::Global) {
+        Current().Type == TokenType::Global ||
+        Current().Type == TokenType::Tmp ||
+        Current().Type == TokenType::Const ||
+        Current().Type == TokenType::Static) {
         // Save current token to backtrack if needed
         Token savedToken = Current();
         
@@ -3046,7 +3049,7 @@ std::unique_ptr<DMASTObjectStatement> DMParser::ObjectStatement() {
         if ((Current().Type == TokenType::Newline || 
              Current().Type == TokenType::Semicolon ||
              Current().Type == TokenType::EndOfFile) && inVarBlock && !isVarKeyword) {
-            
+                     
             // Check if this has a nested indented block after it
             // If so, treat as a type block (object definition), not a variable definition
             // This handles patterns like:
@@ -3077,8 +3080,8 @@ std::unique_ptr<DMASTObjectStatement> DMParser::ObjectStatement() {
                 
                 // Backtrack to before the newline
                 ReuseToken(savedNewlineToken);
-            }
-            
+            }    
+
             // If there's NO nested block, this is a variable definition without initialization
             if (!hasNestedBlock) {
                 // For "Beam/myBeam", path is "Beam/myBeam"
@@ -3162,9 +3165,7 @@ DMASTPath DMParser::ParsePath() {
            Current().Type == TokenType::Const ||
            Current().Type == TokenType::Tmp ||
            Current().Type == TokenType::Static) {
-        // DEBUG
-        // std::cout << "ParsePath consuming: " << Current().Text << " (" << (int)Current().Type << ")" << std::endl;
-        
+
         elements.push_back(Current().Text);
         Advance();
         
