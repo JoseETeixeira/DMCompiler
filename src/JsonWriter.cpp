@@ -96,6 +96,12 @@ void JsonWriter::WriteValue(const JsonValue& value) {
                 WriteKeyValue(key, val);
             }
             EndObject();
+        } else if constexpr (std::is_same_v<T, ResourceRef>) {
+            // Handle resource references: {"type": "resource", "id": N}
+            BeginObject();
+            WriteKeyValue("type", std::string("resource"));
+            WriteKeyValue("id", arg.id);
+            EndObject();
         }
     }, value);
 }

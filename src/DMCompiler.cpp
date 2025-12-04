@@ -245,6 +245,27 @@ void DMCompiler::AddResourceDirectory(const std::string& dir, const Location& lo
     ResourceDirectories_.insert(dir);
 }
 
+void DMCompiler::BuildResourceIdMap() {
+    ResourceIdMap_.clear();
+    int id = 1; // Resource IDs start at 1
+    
+    // Convert unordered_set to ordered vector for consistent IDs
+    std::vector<std::string> sortedResources(ObjectTree_->Resources.begin(), ObjectTree_->Resources.end());
+    std::sort(sortedResources.begin(), sortedResources.end());
+    
+    for (const auto& path : sortedResources) {
+        ResourceIdMap_[path] = id++;
+    }
+}
+
+int DMCompiler::GetResourceId(const std::string& path) const {
+    auto it = ResourceIdMap_.find(path);
+    if (it != ResourceIdMap_.end()) {
+        return it->second;
+    }
+    return -1;
+}
+
 bool DMCompiler::PreprocessFiles() {
     if (Settings_.Verbose) {
         std::cout << "Phase 1: Preprocessing files..." << std::endl;
@@ -921,6 +942,9 @@ bool DMCompiler::OutputJson(const std::string& outputPath) {
         return false;
     }
     
+    // Build resource ID map before writing JSON (needed for variable serialization)
+    BuildResourceIdMap();
+    
     JsonWriter json;
     json.BeginObject();
     
@@ -938,11 +962,14 @@ bool DMCompiler::OutputJson(const std::string& outputPath) {
     }
     json.EndArray();
     
-    // Resources (if any)
+    // Resources (if any) - output in sorted order matching ResourceIdMap_
     if (!ObjectTree_->Resources.empty()) {
+        std::vector<std::string> sortedResources(ObjectTree_->Resources.begin(), ObjectTree_->Resources.end());
+        std::sort(sortedResources.begin(), sortedResources.end());
+        
         json.WriteKey("Resources");
         json.BeginArray();
-        for (const auto& res : ObjectTree_->Resources) {
+        for (const auto& res : sortedResources) {
             json.WriteString(res);
         }
         json.EndArray();
@@ -1023,10 +1050,13 @@ bool DMCompiler::OutputJson(const std::string& outputPath) {
             json.EndArray();
         }
         
-        // Variables
-        if (!obj->Variables.empty()) {
+        // Variables (merge Variables and VariableOverrides)
+        // VariableOverrides contains values for inherited variables like icon = 'path.dmi'
+        if (!obj->Variables.empty() || !obj->VariableOverrides.empty()) {
             json.WriteKey("Variables");
             json.BeginObject();
+            
+            // First write base variable definitions
             for (const auto& [name, var] : obj->Variables) {
                 json.WriteKey(name);
                 
@@ -1042,6 +1072,28 @@ bool DMCompiler::OutputJson(const std::string& outputPath) {
                     json.WriteNull();
                 }
             }
+            
+            // Then write variable overrides (will include icon, icon_state, etc.)
+            for (const auto& [name, var] : obj->VariableOverrides) {
+                // Skip if already written from Variables
+                if (obj->Variables.find(name) != obj->Variables.end()) {
+                    continue;
+                }
+                json.WriteKey(name);
+                
+                // Try to serialize the default value
+                if (var.Value) {
+                    JsonValue jsonValue;
+                    if (var.Value->TryAsJsonRepresentation(this, jsonValue)) {
+                        json.WriteValue(jsonValue);
+                    } else {
+                        json.WriteNull();
+                    }
+                } else {
+                    json.WriteNull();
+                }
+            }
+            
             json.EndObject();
         }
         
@@ -1165,6 +1217,111 @@ bool DMCompiler::OutputJson(const std::string& outputPath) {
     }
     json.EndArray();
     
+    // Maps (if any)
+    if (!ParsedMaps_.empty()) {
+        json.WriteKey("Maps");
+        json.BeginArray();
+        for (const auto& map : ParsedMaps_) {
+            json.BeginObject();
+            
+            // Map dimensions
+            json.WriteKeyValue("MaxX", map->MaxX);
+            json.WriteKeyValue("MaxY", map->MaxY);
+            json.WriteKeyValue("MaxZ", map->MaxZ);
+            
+            // Cell definitions
+            json.WriteKey("CellDefinitions");
+            json.BeginObject();
+            for (const auto& [name, cell] : map->CellDefinitions) {
+                json.WriteKey(name);
+                json.BeginObject();
+                
+                // Turf
+                if (cell->Turf) {
+                    json.WriteKey("Turf");
+                    json.BeginObject();
+                    json.WriteKeyValue("Type", cell->Turf->Type);
+                    if (!cell->Turf->VarOverrides.empty()) {
+                        json.WriteKey("VarOverrides");
+                        json.BeginObject();
+                        for (const auto& [varName, varValue] : cell->Turf->VarOverrides) {
+                            json.WriteKey(varName);
+                            json.WriteValue(varValue);
+                        }
+                        json.EndObject();
+                    }
+                    json.EndObject();
+                }
+                
+                // Area
+                if (cell->Area) {
+                    json.WriteKey("Area");
+                    json.BeginObject();
+                    json.WriteKeyValue("Type", cell->Area->Type);
+                    if (!cell->Area->VarOverrides.empty()) {
+                        json.WriteKey("VarOverrides");
+                        json.BeginObject();
+                        for (const auto& [varName, varValue] : cell->Area->VarOverrides) {
+                            json.WriteKey(varName);
+                            json.WriteValue(varValue);
+                        }
+                        json.EndObject();
+                    }
+                    json.EndObject();
+                }
+                
+                // Objects
+                if (!cell->Objects.empty()) {
+                    json.WriteKey("Objects");
+                    json.BeginArray();
+                    for (const auto& obj : cell->Objects) {
+                        json.BeginObject();
+                        json.WriteKeyValue("Type", obj->Type);
+                        if (!obj->VarOverrides.empty()) {
+                            json.WriteKey("VarOverrides");
+                            json.BeginObject();
+                            for (const auto& [varName, varValue] : obj->VarOverrides) {
+                                json.WriteKey(varName);
+                                json.WriteValue(varValue);
+                            }
+                            json.EndObject();
+                        }
+                        json.EndObject();
+                    }
+                    json.EndArray();
+                }
+                
+                json.EndObject();
+            }
+            json.EndObject();
+            
+            // Map blocks
+            json.WriteKey("Blocks");
+            json.BeginArray();
+            for (const auto& block : map->Blocks) {
+                json.BeginObject();
+                json.WriteKeyValue("X", block->X);
+                json.WriteKeyValue("Y", block->Y);
+                json.WriteKeyValue("Z", block->Z);
+                json.WriteKeyValue("Width", block->Width);
+                json.WriteKeyValue("Height", block->Height);
+                
+                json.WriteKey("Cells");
+                json.BeginArray();
+                for (const auto& cellRef : block->Cells) {
+                    json.WriteString(cellRef);
+                }
+                json.EndArray();
+                
+                json.EndObject();
+            }
+            json.EndArray();
+            
+            json.EndObject();
+        }
+        json.EndArray();
+    }
+    
     // Optional errors (runtime configuration warnings in range 4000-4999)
     json.WriteKey("OptionalErrors");
     json.BeginObject();
@@ -1186,6 +1343,7 @@ bool DMCompiler::OutputJson(const std::string& outputPath) {
         std::cout << "  Types: " << ObjectTree_->AllObjects.size() << std::endl;
         std::cout << "  Procs: " << ObjectTree_->AllProcs.size() << std::endl;
         std::cout << "  Strings: " << ObjectTree_->StringTable.size() << std::endl;
+        std::cout << "  Maps: " << ParsedMaps_.size() << std::endl;
     }
     return true;
 }

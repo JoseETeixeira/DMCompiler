@@ -53,7 +53,14 @@ bool DMASTStringFormat::TryAsJsonRepresentation(DMCompiler* compiler, JsonValue&
 
 // DMASTConstantResource
 bool DMASTConstantResource::TryAsJsonRepresentation(DMCompiler* compiler, JsonValue& outJson) {
-    // Resources are serialized as their path string
+    // Resources are serialized as {"type": "resource", "id": N}
+    // Look up the resource ID from the compiler
+    int resourceId = compiler->GetResourceId(Path);
+    if (resourceId > 0) {
+        outJson = ResourceRef(resourceId);
+        return true;
+    }
+    // Fallback: output as string if ID not found
     outJson = Path;
     return true;
 }

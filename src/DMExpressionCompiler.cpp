@@ -102,6 +102,9 @@ bool DMExpressionCompiler::CompileConstantString(DMASTConstantString* expr) {
 }
 
 bool DMExpressionCompiler::CompileConstantResource(DMASTConstantResource* expr) {
+    // Add resource path to the Resources set for packaging
+    Compiler_->GetObjectTree()->Resources.insert(expr->Path);
+    
     Writer_->EmitString(DreamProcOpcode::PushResource, expr->Path);
     Writer_->ResizeStack(1);  // Pushes 1 value onto stack
     return true;

@@ -108,6 +108,12 @@ public:
     // Resource management
     void AddResourceDirectory(const std::string& dir, const Location& loc);
     
+    /// Build resource ID map (call before JSON output to enable resource ID lookups)
+    void BuildResourceIdMap();
+    
+    /// Get the ID for a resource path (returns -1 if not found or map not built)
+    int GetResourceId(const std::string& path) const;
+    
     // Accessors
     DMObjectTree* GetObjectTree() { return ObjectTree_.get(); }
     DMCodeTree* GetCodeTree() { return CodeTree_.get(); }
@@ -125,6 +131,9 @@ private:
     std::set<std::string> ResourceDirectories_;
     std::vector<std::string> CompilerMessages_;
     std::unordered_map<WarningCode, ErrorLevel> ErrorConfig_;
+    
+    /// Resource path to ID mapping (built during JSON output)
+    std::unordered_map<std::string, int> ResourceIdMap_;
     
     std::set<WarningCode> UniqueEmissions_;
     int ErrorCount_;

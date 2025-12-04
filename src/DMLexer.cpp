@@ -108,14 +108,15 @@ Token DMLexer::ParseNextToken() {
         bracketNesting_ = std::max(0, bracketNesting_ - 1);
     }
     
-    // Strings
-    if (current == '"' || current == '\'') {
-        return ParseString();
-    }
-    
-    // Resources
+    // Resources (single quotes) - must check before strings
+    // In BYOND, 'path/to/resource.dmi' denotes a resource file
     if (current == '\'') {
         return ParseResource();
+    }
+    
+    // Strings (double quotes only)
+    if (current == '"') {
+        return ParseString();
     }
     
     // Numbers
@@ -371,7 +372,7 @@ Token DMLexer::ParseMultiLineString() {
 }
 
 Token DMLexer::ParseResource() {
-    std::string resource = "'";
+    std::string resource;  // Just the path, without quotes
     Location startLoc = CurrentLocation_;
     Advance(); // Skip opening '
     
@@ -381,11 +382,10 @@ Token DMLexer::ParseResource() {
     }
     
     if (!AtEndOfSource_) {
-        resource += GetCurrent();
         Advance(); // Skip closing '
     }
     
-    return Token(TokenType::Resource, resource, startLoc);
+    return Token(TokenType::Resource, resource, startLoc, Token::TokenValue(resource));
 }
 
 Token DMLexer::ParseOperator() {

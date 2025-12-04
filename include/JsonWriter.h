@@ -9,6 +9,12 @@
 
 namespace DMCompiler {
 
+// Resource reference with ID (serialized as {"type": "resource", "id": N})
+struct ResourceRef {
+    int id;
+    explicit ResourceRef(int id) : id(id) {}
+};
+
 // JsonValue type for representing JSON values from expressions
 using JsonValue = std::variant<
     std::nullptr_t,
@@ -16,7 +22,8 @@ using JsonValue = std::variant<
     int64_t,
     double,
     std::string,
-    std::unordered_map<std::string, std::string>
+    std::unordered_map<std::string, std::string>,
+    ResourceRef
 >;
 
 /// Simple JSON writer helper for serializing compiler output
