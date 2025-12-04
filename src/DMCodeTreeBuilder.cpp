@@ -122,6 +122,10 @@ void DMCodeTreeBuilder::ProcessStatementWithVarContext(DMASTStatement* statement
         } else {
             // Normal object definition - not in var block context
             // Add the type to the object tree
+            if (Compiler_->GetSettings().Verbose) {
+                std::cout << "  Adding type: " << typePath.ToString() 
+                         << " with " << objectDef->InnerStatements.size() << " inner statements" << std::endl;
+            }
             ObjectTree_->AddType(typePath);
             
             for (const auto& innerStmt : objectDef->InnerStatements) {

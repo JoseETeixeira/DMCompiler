@@ -105,6 +105,7 @@ private:
     // Current parsing state
     DreamPath CurrentPath_;
     bool AllowVarDeclExpression_;
+    bool ParsingTernary_;
     
     // Progress tracking for loop detection
     size_t LastTokenPosition_;      // Last token position (line * 10000 + column)
@@ -206,6 +207,7 @@ private:
     std::unique_ptr<DMASTObjectStatement> ObjectProcDefinition(bool isVerb = false);
     std::unique_ptr<DMASTObjectStatement> ObjectVarDefinition();
     std::unique_ptr<DMASTObjectStatement> ObjectDefinition();
+    std::unique_ptr<DMASTObjectStatement> ObjectDefinition(const DMASTPath& path, Location loc);
     std::unique_ptr<DMASTDefinitionParameter> ProcParameter();
     
     // Helper methods

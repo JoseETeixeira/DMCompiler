@@ -21,7 +21,7 @@
 	set opendream_unimplemented = TRUE
 /proc/load_resource(File)
 	set opendream_unimplemented = TRUE
-proc/missile(Type, Start, End)
+/proc/missile(Type, Start, End)
 	set opendream_unimplemented = TRUE
 /proc/obounds(Ref=src, Dist=0)
 	set opendream_unimplemented = TRUE

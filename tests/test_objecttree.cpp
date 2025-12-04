@@ -177,6 +177,8 @@ TEST(TestStringTable) {
 // Test global variable creation
 TEST(TestGlobalVariableCreation) {
     DMObjectTree tree(nullptr);
+    size_t initialGlobals = tree.Globals.size();
+    
     DMVariable global(std::nullopt, "temp", true, false, false, false);
     std::string varName = "test_var";
     DMComplexValueType valType(DMValueType::Num);  // Changed from string to DMValueType
@@ -190,10 +192,10 @@ TEST(TestGlobalVariableCreation) {
         valType
     );
     
-    EXPECT_EQ(id, 0);
-    EXPECT_EQ(tree.Globals.size(), 1u);
-    EXPECT_EQ(tree.Globals[0].Name, varName);
-    EXPECT_TRUE(tree.Globals[0].IsGlobal);
+    EXPECT_EQ(id, static_cast<int>(initialGlobals));
+    EXPECT_EQ(tree.Globals.size(), initialGlobals + 1);
+    EXPECT_EQ(tree.Globals[id].Name, varName);
+    EXPECT_TRUE(tree.Globals[id].IsGlobal);
 }
 
 // Test DMObject variable operations

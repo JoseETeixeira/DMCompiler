@@ -99,6 +99,7 @@ DMParser::DMParser(DMCompiler* compiler, DMLexer* lexer)
     , Lexer_(lexer)
     , CurrentPath_(DreamPath::Root)
     , AllowVarDeclExpression_(false)
+    , ParsingTernary_(false)
     , LastTokenPosition_(0)
     , NoProgressCounter_(0)
     , NestingDepth_(0)
@@ -692,8 +693,9 @@ std::unique_ptr<DMASTExpression> DMParser::PostfixExpression() {
         // This is tricky because colon is also used in ternary (cond ? a : b)
         // Heuristic: if we just completed a function call like func(), the colon is likely ternary
         // If the left side is a simple identifier or dereference, colon is likely member access
+        // Also, if we are parsing the true branch of a ternary, colon is likely the ternary separator
         bool isColonMemberAccess = false;
-        if (Current().Type == TokenType::Colon && !justCompletedCall) {
+        if (Current().Type == TokenType::Colon && !justCompletedCall && !ParsingTernary_) {
             // Peek at next token to see if it's an identifier
             Token colonToken = Current();
             Token nextToken = Advance();
@@ -1149,7 +1151,10 @@ std::unique_ptr<DMASTExpression> DMParser::TernaryExpression() {
         Advance();
         
         // Parse true branch
+        bool oldParsingTernary = ParsingTernary_;
+        ParsingTernary_ = true;
         auto trueExpr = Expression();  // Allow full expressions including assignments in branches
+        ParsingTernary_ = oldParsingTernary;
         
         // Expect colon
         if (Current().Type != TokenType::Colon) {
@@ -1828,9 +1833,13 @@ std::unique_ptr<DMASTProcStatement> DMParser::ProcStatementIf() {
     }
     
     // Else clause (optional) - only if it's at the SAME column as the if statement
+    // OR if it's on the same line (for single-line if-else)
     // This prevents incorrectly associating an else from an outer scope
     std::unique_ptr<DMASTProcBlockInner> elseBody;
-    if (Current().Type == TokenType::Else && CurrentLocation().Column == loc.Column) {
+    bool isSameLine = CurrentLocation().Line == loc.Line;
+    bool isSameColumn = CurrentLocation().Column == loc.Column;
+    
+    if (Current().Type == TokenType::Else && (isSameColumn || isSameLine)) {
         Advance();
         
         // Consume only whitespace before else body - let ProcBlockInner handle newlines
@@ -1889,8 +1898,12 @@ std::unique_ptr<DMASTProcStatement> DMParser::ProcStatementIfWithBaseIndent(int 
     }
     
     // Else clause (optional) - only if it's at the SAME column as the base indent
+    // OR if it's on the same line (for single-line if-else)
     std::unique_ptr<DMASTProcBlockInner> elseBody;
-    if (Current().Type == TokenType::Else && CurrentLocation().Column == baseIndent) {
+    bool isSameLine = CurrentLocation().Line == loc.Line;
+    bool isSameColumn = CurrentLocation().Column == baseIndent;
+    
+    if (Current().Type == TokenType::Else && (isSameColumn || isSameLine)) {
         Advance();
         
         // Consume only whitespace before else body
@@ -3122,16 +3135,16 @@ std::unique_ptr<DMASTObjectStatement> DMParser::ObjectStatement() {
             // This will properly update CurrentPath_ to include the type (e.g., "list")
         }
         
-        // Otherwise, backtrack and parse as object definition
-        ReuseToken(savedToken);
+        // Otherwise, use the already-parsed path for the object definition
+        // IMPORTANT: We don't use ReuseToken here because it only puts back one token,
+        // but the path might have multiple tokens (e.g., "human/player" = 3 tokens).
+        // Instead, we pass the already-parsed path directly to ObjectDefinition.
+        return ObjectDefinition(path, loc);
     }
     
-    // Try to parse as object definition
+    // Try to parse as object definition (for paths starting with '/')
     // ObjectDefinition will handle the rest
-    if (Current().Type == TokenType::Divide || 
-        IsInSet(Current().Type, IdentifierTypes_) ||
-        Current().Type == TokenType::Var ||
-        Current().Type == TokenType::Global) {
+    if (Current().Type == TokenType::Divide) {
         auto def = ObjectDefinition();
         return std::unique_ptr<DMASTObjectStatement>(static_cast<DMASTObjectStatement*>(def.release()));
     }
@@ -3147,6 +3160,13 @@ DMASTPath DMParser::ParsePath() {
     // Skip leading whitespace
     Whitespace();
     
+    bool verbose = Compiler_ && Compiler_->GetSettings().Verbose;
+    bool debugThis = verbose && (Current().Text == "human" || Current().Text == "player" || Current().Text == "npc");
+    
+    if (debugThis) {
+        std::cout << "  ParsePath: starting with token=" << Current().Text 
+                 << " type=" << static_cast<int>(Current().Type) << std::endl;
+    }
     
     // Check for absolute path
     if (Current().Type == TokenType::Divide) {
@@ -3167,16 +3187,27 @@ DMASTPath DMParser::ParsePath() {
            Current().Type == TokenType::Static) {
 
         elements.push_back(Current().Text);
+        if (debugThis) {
+            std::cout << "  ParsePath: added element " << Current().Text << std::endl;
+        }
         Advance();
         
         // Skip whitespace after identifier
         Whitespace();
         
         if (Current().Type == TokenType::Divide) {
+            if (debugThis) {
+                std::cout << "  ParsePath: found '/' continuing" << std::endl;
+            }
             Advance();
             // Skip whitespace after /
             Whitespace();
         } else {
+            if (debugThis) {
+                std::cout << "  ParsePath: next token=" << Current().Text 
+                         << " type=" << static_cast<int>(Current().Type) 
+                         << " breaking" << std::endl;
+            }
             break;
         }
     }
@@ -3510,9 +3541,27 @@ std::unique_ptr<DMASTObjectStatement> DMParser::ObjectDefinition() {
     // Parse object path
     auto path = ParsePath();
     
+    // Delegate to the overload that takes a pre-parsed path
+    return ObjectDefinition(path, loc);
+}
+
+std::unique_ptr<DMASTObjectStatement> DMParser::ObjectDefinition(const DMASTPath& path, Location loc) {
     // Save old path and update CurrentPath_
     DreamPath oldPath = CurrentPath_;
     DreamPath newPath = CurrentPath_.Combine(path.Path);
+    
+    bool verbose = Compiler_ && Compiler_->GetSettings().Verbose;
+    if (verbose && (path.Path.ToString().find("npc") != std::string::npos || 
+                   path.Path.ToString().find("human") != std::string::npos ||
+                   path.Path.ToString().find("player") != std::string::npos)) {
+        std::cout << "  OBJDEF: oldPath=" << oldPath.ToString()
+                 << " path=" << path.Path.ToString() 
+                 << " newPath=" << newPath.ToString()
+                 << " from " << loc.SourceFile 
+                 << " at line " << loc.Line << " col " << loc.Column
+                 << " next token=" << Current().Text << std::endl;
+    }
+    
     CurrentPath_ = newPath;
     
     // Check for body
@@ -3574,6 +3623,8 @@ int DMParser::GetCurrentIndentation() {
 std::vector<std::unique_ptr<DMASTObjectStatement>> DMParser::ParseIndentedObjectBlock(int baseIndent) {
     std::vector<std::unique_ptr<DMASTObjectStatement>> statements;
     
+    bool verbose = Compiler_ && Compiler_->GetSettings().Verbose;
+    
     // Parse all statements that are indented more than the base level
     while (Current().Type != TokenType::EndOfFile) {
         // Skip empty lines
@@ -3587,6 +3638,9 @@ std::vector<std::unique_ptr<DMASTObjectStatement>> DMParser::ParseIndentedObject
         
         // Check indentation
         int currentIndent = GetCurrentIndentation();
+        
+        // Debug only when CurrentPath exactly ends with "/mob/human/player/npc"
+        std::string pathStr = CurrentPath_.ToString();
         
         // If we're back at or before the base indentation, we're done with this block
         if (currentIndent <= baseIndent) {
