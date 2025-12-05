@@ -17,6 +17,7 @@ void PrintHelp() {
     std::cout << "  --dump-preprocessor       : Save the result of preprocessing in a file" << std::endl;
     std::cout << "  --no-standard             : Disable built-in standard library" << std::endl;
     std::cout << "  --define [KEY=VAL]        : Add extra defines to the compilation" << std::endl;
+    std::cout << "  --lib-path [PATH]         : Add a path to search for external libraries" << std::endl;
     std::cout << "  --verbose                 : Show verbose output during compile" << std::endl;
     std::cout << "  --notices-enabled         : Show notice output during compile" << std::endl;
     std::cout << "  --no-opts                 : Disable compiler optimizations (debug only)" << std::endl;
@@ -73,6 +74,9 @@ bool ParseArguments(int argc, char** argv, DMCompiler::DMCompilerSettings& setti
             } else {
                 settings.MacroDefines[define] = "1";
             }
+        }
+        else if (arg == "--lib-path" && i + 1 < argc) {
+            settings.LibraryPaths.push_back(argv[++i]);
         }
         else if (arg[0] == '-') {
             if (!skipBadArgs) {

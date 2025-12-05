@@ -69,6 +69,47 @@ const std::array<TokenType, 1> DMParser::WhitespaceTypes_ = {
     TokenType::DM_Preproc_Whitespace  // Only skip actual whitespace, NOT Indent/Dedent!
 };
 
+// Keywords that can be used as identifiers in certain contexts
+// In DM, most keywords can be used as variable/type names
+static bool IsIdentifierLike(TokenType type) {
+    switch (type) {
+        case TokenType::Identifier:
+        case TokenType::Step:
+        case TokenType::Proc:
+        case TokenType::Verb:
+        case TokenType::Default:  // Common in var/default
+        case TokenType::Null:
+        case TokenType::Switch:
+        case TokenType::New:
+        case TokenType::Do:
+        case TokenType::While:
+        case TokenType::For:
+        case TokenType::If:
+        case TokenType::Else:
+        case TokenType::Return:
+        case TokenType::Break:
+        case TokenType::Continue:
+        case TokenType::Goto:
+        case TokenType::In:
+        case TokenType::To:
+        case TokenType::As:
+        case TokenType::Set:
+        case TokenType::Tmp:
+        case TokenType::Const:
+        case TokenType::Static:
+        case TokenType::Global:
+        case TokenType::Spawn:
+        case TokenType::Try:
+        case TokenType::Catch:
+        case TokenType::Throw:
+        case TokenType::Del:
+        case TokenType::Case:
+            return true;
+        default:
+            return false;
+    }
+}
+
 const std::array<TokenType, 3> DMParser::IdentifierTypes_ = {
     TokenType::Identifier,
     TokenType::Step,
@@ -467,7 +508,7 @@ std::unique_ptr<DMASTExpression> DMParser::PrimaryExpression() {
     
     // List expression: list(1, 2, 3)
     // Note: We need to check if it's the 'list' identifier followed by parenthesis
-    if (IsInSet(token.Type, IdentifierTypes_) && token.Text == "list") {
+    if (IsIdentifierLike(token.Type) && token.Text == "list") {
         Location listLoc = loc;
         Advance();
         if (Current().Type == TokenType::LeftParenthesis) {
@@ -479,7 +520,7 @@ std::unique_ptr<DMASTExpression> DMParser::PrimaryExpression() {
     }
     
     // newlist expression: newlist(/obj/item, /mob/player)
-    if (IsInSet(token.Type, IdentifierTypes_) && token.Text == "newlist") {
+    if (IsIdentifierLike(token.Type) && token.Text == "newlist") {
         Location newlistLoc = loc;
         Advance();
         if (Current().Type == TokenType::LeftParenthesis) {
@@ -491,7 +532,8 @@ std::unique_ptr<DMASTExpression> DMParser::PrimaryExpression() {
     }
     
     // Identifier or path
-    if (IsInSet(token.Type, IdentifierTypes_)) {
+    // Keywords can also be used as identifiers in certain contexts (e.g., var/default)
+    if (IsIdentifierLike(token.Type)) {
         std::string identifier = token.Text;
         Advance();
         // For now, just return an identifier expression
@@ -691,22 +733,61 @@ std::unique_ptr<DMASTExpression> DMParser::PostfixExpression() {
         
         // Check for colon runtime member access (obj:prop)
         // This is tricky because colon is also used in ternary (cond ? a : b)
-        // Heuristic: if we just completed a function call like func(), the colon is likely ternary
-        // If the left side is a simple identifier or dereference, colon is likely member access
-        // Also, if we are parsing the true branch of a ternary, colon is likely the ternary separator
+        // 
+        // Rules for determining if colon is member access vs ternary:
+        // 1. If we just completed a function call like func(), the colon is likely ternary separator
+        // 2. Colon must be followed by an identifier to be member access
+        // 3. The left operand must be a valid dereference target (identifier, dereference, proc call, etc.)
+        //    - Literals (numbers, strings, null) cannot have member access
+        //
+        // Examples:
+        //   loc:loc in "cond ? loc:loc : null" - member access (identifier : identifier)
+        //   1000 : ix in "cond ? 1000 : ix / move_x" - ternary separator (literal cannot have member access)
         bool isColonMemberAccess = false;
-        if (Current().Type == TokenType::Colon && !justCompletedCall && !ParsingTernary_) {
-            // Peek at next token to see if it's an identifier
-            Token colonToken = Current();
-            Token nextToken = Advance();
-            if (IsInSet(nextToken.Type, IdentifierTypes_)) {
-                isColonMemberAccess = true;
-                ReuseToken(nextToken);
-                CurrentToken_ = colonToken;
-            } else {
-                ReuseToken(nextToken);
-                CurrentToken_ = colonToken;
+        if (Current().Type == TokenType::Colon && !justCompletedCall) {
+            // First check: is the left side a valid dereference target?
+            // Literals (numbers, strings, null, etc.) cannot have member access
+            bool isValidDerefTarget = dynamic_cast<DMASTIdentifier*>(expr.get()) != nullptr ||
+                                      dynamic_cast<DMASTDereference*>(expr.get()) != nullptr ||
+                                      dynamic_cast<DMASTExpressionUnary*>(expr.get()) != nullptr ||
+                                      dynamic_cast<DMASTCall*>(expr.get()) != nullptr ||
+                                      dynamic_cast<DMASTNewPath*>(expr.get()) != nullptr ||
+                                      dynamic_cast<DMASTNewList*>(expr.get()) != nullptr ||
+                                      dynamic_cast<DMASTList*>(expr.get()) != nullptr;
+            
+            if (isValidDerefTarget) {
+                // Peek at next token to see if it's a property name (member access) or something else (ternary separator)
+                Token colonToken = Current();
+                Token nextToken = Advance();
+                
+                // For member access, the next token should be a simple identifier or keyword-as-identifier
+                // But NOT something that would start a full expression (like null, new, etc.)
+                // When parsing inside a ternary, be more conservative - only accept simple identifiers
+                bool isPropertyName = false;
+                if (nextToken.Type == TokenType::Identifier ||
+                    nextToken.Type == TokenType::Step ||
+                    nextToken.Type == TokenType::Proc) {
+                    // These are safe as property names
+                    isPropertyName = true;
+                } else if (!ParsingTernary_ && IsIdentifierLike(nextToken.Type)) {
+                    // When NOT in ternary, allow keywords as property names
+                    // But when IN ternary, keywords like 'null' are more likely to be the false branch
+                    isPropertyName = true;
+                }
+                
+                if (isPropertyName) {
+                    // Colon followed by property name = member access
+                    isColonMemberAccess = true;
+                    ReuseToken(nextToken);
+                    CurrentToken_ = colonToken;
+                } else {
+                    // Colon followed by something else = ternary separator or other use
+                    ReuseToken(nextToken);
+                    CurrentToken_ = colonToken;
+                }
             }
+            // If not a valid deref target (e.g., literal 1000), don't check for member access
+            // Let the colon be treated as ternary separator
         }
         
         // Member access: obj.property, obj:property (runtime), or obj?.property (null-conditional)
@@ -722,7 +803,7 @@ std::unique_ptr<DMASTExpression> DMParser::PostfixExpression() {
             
             // Parse the property name (identifier or expression in brackets)
             std::unique_ptr<DMASTExpression> property;
-            if (IsInSet(Current().Type, IdentifierTypes_)) {
+            if (IsIdentifierLike(Current().Type)) {
                 Location propLoc = CurrentLocation();
                 std::string propName = Current().Text;
                 Advance();
@@ -733,7 +814,10 @@ std::unique_ptr<DMASTExpression> DMParser::PostfixExpression() {
                 property = Expression();
                 Consume(TokenType::RightBracket, "Expected ']' after dynamic property access");
             } else {
-                const char* opStr = (derefType == DereferenceType::Safe) ? "?." : ".";
+                const char* opStr;
+                if (derefType == DereferenceType::Safe) opStr = "?.";
+                else if (derefType == DereferenceType::Search) opStr = ":";
+                else opStr = ".";
                 Emit(WarningCode::BadToken, "Expected property name after '" + std::string(opStr) + "'");
                 break;
             }
@@ -1163,8 +1247,20 @@ std::unique_ptr<DMASTExpression> DMParser::TernaryExpression() {
         }
         Advance();
         
-        // Parse false branch (recursive for right-associativity)
-        auto falseExpr = TernaryExpression();
+        // Check for empty false branch in string interpolation
+        // In DM, you can write: "[condition ? value : ]" where the false branch is implicitly null
+        // This occurs when the next token is a string continuation (StringMiddle/StringEnd)
+        // or a right bracket (end of string interpolation)
+        std::unique_ptr<DMASTExpression> falseExpr;
+        if (Current().Type == TokenType::DM_Preproc_StringMiddle ||
+            Current().Type == TokenType::DM_Preproc_StringEnd ||
+            Current().Type == TokenType::RightBracket) {
+            // Empty false branch - use null
+            falseExpr = std::make_unique<DMASTConstantNull>(loc);
+        } else {
+            // Parse false branch (recursive for right-associativity)
+            falseExpr = TernaryExpression();
+        }
         
         return std::make_unique<DMASTTernary>(loc, std::move(condition), std::move(trueExpr), std::move(falseExpr));
     }
@@ -1693,7 +1789,9 @@ void DMParser::ParseVarDeclarations(std::vector<DMASTProcStatementVarDeclaration
             hasSlashes = true;
         }
         
-        while (IsInSet(Current().Type, IdentifierTypes_)) {
+        // Use IsIdentifierLike to allow keywords as variable names
+        // In DM, keywords like 'default', 'null', etc. can be used as variable names
+        while (IsIdentifierLike(Current().Type)) {
             pathElements.push_back(Current().Text);
             Advance();
             

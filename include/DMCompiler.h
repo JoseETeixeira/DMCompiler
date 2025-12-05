@@ -32,6 +32,7 @@ struct DreamMapJson;
 struct DMCompilerSettings {
     std::vector<std::string> Files;
     std::unordered_map<std::string, std::string> MacroDefines;
+    std::vector<std::string> LibraryPaths;  // Paths to search for external libraries (e.g., BYOND lib folder)
     bool SuppressUnimplementedWarnings = false;
     bool SuppressUnsupportedAccessWarnings = false;
     bool SkipAnythingTypecheck = false;

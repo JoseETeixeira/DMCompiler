@@ -978,6 +978,95 @@ std::string DMPreprocessor::ResolvePath(const std::string& path, const std::stri
     return result;
 }
 
+std::string DMPreprocessor::ResolveLibraryPath(const std::string& libraryPath, const Location& location) {
+    namespace fs = std::filesystem;
+    
+    // Library path format: author\project\file.dme or author/project/file.dme
+    // These are stored in BYOND's lib folder or user-specified library paths
+    
+    // Normalize path separators
+    std::string normalizedPath = libraryPath;
+    std::replace(normalizedPath.begin(), normalizedPath.end(), '\\', '/');
+    
+    // Get library search paths from compiler settings
+    std::vector<std::string> searchPaths;
+    
+    if (Compiler_) {
+        // Use user-specified library paths first
+        searchPaths = Compiler_->GetSettings().LibraryPaths;
+    }
+    
+    // Add default BYOND library locations
+#ifdef _WIN32
+    // Windows: Check common BYOND installation paths
+    // %USERPROFILE%\Documents\BYOND\lib
+    // %USERPROFILE%\My Documents\BYOND\lib
+    const char* userProfile = std::getenv("USERPROFILE");
+    if (userProfile) {
+        searchPaths.push_back(std::string(userProfile) + "/Documents/BYOND/lib");
+        searchPaths.push_back(std::string(userProfile) + "/My Documents/BYOND/lib");
+    }
+    // Also check OneDrive paths
+    const char* oneDrive = std::getenv("OneDrive");
+    if (oneDrive) {
+        searchPaths.push_back(std::string(oneDrive) + "/Documents/BYOND/lib");
+        searchPaths.push_back(std::string(oneDrive) + "/Documentos/BYOND/lib");
+    }
+#else
+    // Unix: Check ~/.byond/lib
+    const char* home = std::getenv("HOME");
+    if (home) {
+        searchPaths.push_back(std::string(home) + "/.byond/lib");
+    }
+#endif
+    
+    // Also check relative to the current file and project root
+    if (!FileStack_.empty()) {
+        fs::path currentDir = fs::path(FileStack_.top().FilePath).parent_path();
+        searchPaths.push_back(currentDir.string());
+        searchPaths.push_back((currentDir / "lib").string());
+        searchPaths.push_back((currentDir.parent_path() / "lib").string());
+    }
+    
+    // Search for the library file in each search path
+    for (const auto& basePath : searchPaths) {
+        if (basePath.empty()) continue;
+        
+        fs::path fullPath = fs::path(basePath) / normalizedPath;
+        
+        if (Compiler_ && Compiler_->GetSettings().Verbose) {
+            std::cout << "  Searching for library: " << fullPath.string() << std::endl;
+        }
+        
+        try {
+            if (fs::exists(fullPath)) {
+                std::string result = fs::canonical(fullPath).string();
+                if (Compiler_ && Compiler_->GetSettings().Verbose) {
+                    std::cout << "  Found library at: " << result << std::endl;
+                }
+                return result;
+            }
+        } catch (const fs::filesystem_error&) {
+            // Path doesn't exist or isn't accessible, continue to next
+        }
+    }
+    
+    // Library not found - report warning with search paths tried
+    std::string searchedPaths;
+    for (const auto& p : searchPaths) {
+        if (!p.empty()) {
+            if (!searchedPaths.empty()) searchedPaths += ", ";
+            searchedPaths += p;
+        }
+    }
+    
+    ReportError(location, "External library not found: <" + libraryPath + ">. "
+        "Searched in: " + (searchedPaths.empty() ? "(no library paths configured)" : searchedPaths) + ". "
+        "Use --lib-path to specify additional library search directories.");
+    
+    return ""; // Return empty string to indicate failure
+}
+
 // Directive handler implementations
 void DMPreprocessor::HandleIncludeDirective(const Token& token) {
     // Read the file path token using GetNextRawToken
@@ -988,27 +1077,63 @@ void DMPreprocessor::HandleIncludeDirective(const Token& token) {
         pathToken = GetNextRawToken();
     }
     
-    // Extract file path
-    if (pathToken.Type != TokenType::DM_Preproc_ConstantString && 
-        pathToken.Type != TokenType::String && 
-        pathToken.Type != TokenType::Identifier) {
-        ReportError(token.Loc, "#include directive requires a file path (string or identifier)");
+    std::string filePath;
+    bool isLibraryInclude = false;
+    
+    // Check for angle bracket include: #include <library/path.dme>
+    if (pathToken.Type == TokenType::Less) {
+        isLibraryInclude = true;
+        
+        // Read tokens until we hit > or newline
+        std::string libraryPath;
+        Token nextToken = GetNextRawToken();
+        while (nextToken.Type != TokenType::Greater && 
+               nextToken.Type != TokenType::Newline && 
+               nextToken.Type != TokenType::EndOfFile) {
+            // Accumulate the path text
+            libraryPath += nextToken.Text;
+            nextToken = GetNextRawToken();
+        }
+        
+        if (nextToken.Type != TokenType::Greater) {
+            ReportError(token.Loc, "Unterminated angle bracket include - expected '>'");
+            return;
+        }
+        
+        filePath = libraryPath;
+    }
+    // Standard quoted or identifier include
+    else if (pathToken.Type == TokenType::DM_Preproc_ConstantString || 
+             pathToken.Type == TokenType::String || 
+             pathToken.Type == TokenType::Identifier) {
+        // Extract the file path (remove quotes if present)
+        filePath = pathToken.Text;
+        if (filePath.length() >= 2 && filePath.front() == '"' && filePath.back() == '"') {
+            filePath = filePath.substr(1, filePath.length() - 2);
+        }
+    }
+    else {
+        ReportError(token.Loc, "#include directive requires a file path (string, identifier, or <library>)");
         return;
     }
     
-    // Extract the file path (remove quotes if present)
-    std::string filePath = pathToken.Text;
-    if (filePath.length() >= 2 && filePath.front() == '"' && filePath.back() == '"') {
-        filePath = filePath.substr(1, filePath.length() - 2);
-    }
-    
-    // Resolve path relative to current file
-    std::string resolvedPath = filePath;
-    if (!FileStack_.empty()) {
-        std::string currentFile = FileStack_.top().FilePath;
-        namespace fs = std::filesystem;
-        fs::path currentDir = fs::path(currentFile).parent_path();
-        resolvedPath = (currentDir / filePath).string();
+    // Resolve the path
+    std::string resolvedPath;
+    if (isLibraryInclude) {
+        // Resolve library path using library search directories
+        resolvedPath = ResolveLibraryPath(filePath, token.Loc);
+        if (resolvedPath.empty()) {
+            return; // Error already reported by ResolveLibraryPath
+        }
+    } else {
+        // Resolve path relative to current file
+        resolvedPath = filePath;
+        if (!FileStack_.empty()) {
+            std::string currentFile = FileStack_.top().FilePath;
+            namespace fs = std::filesystem;
+            fs::path currentDir = fs::path(currentFile).parent_path();
+            resolvedPath = (currentDir / filePath).string();
+        }
     }
     
     // Check if already included (skip if so)
@@ -1969,27 +2094,63 @@ void DMPreprocessor::HandleIncludeDirectiveStreaming(const Token& token) {
         pathToken = GetNextRawToken();
     }
     
-    // Extract file path
-    if (pathToken.Type != TokenType::DM_Preproc_ConstantString && 
-        pathToken.Type != TokenType::String && 
-        pathToken.Type != TokenType::Identifier) {
-        ReportError(token.Loc, "#include directive requires a file path (string or identifier)");
+    std::string filePath;
+    bool isLibraryInclude = false;
+    
+    // Check for angle bracket include: #include <library/path.dme>
+    if (pathToken.Type == TokenType::Less) {
+        isLibraryInclude = true;
+        
+        // Read tokens until we hit > or newline
+        std::string libraryPath;
+        Token nextToken = GetNextRawToken();
+        while (nextToken.Type != TokenType::Greater && 
+               nextToken.Type != TokenType::Newline && 
+               nextToken.Type != TokenType::EndOfFile) {
+            // Accumulate the path text
+            libraryPath += nextToken.Text;
+            nextToken = GetNextRawToken();
+        }
+        
+        if (nextToken.Type != TokenType::Greater) {
+            ReportError(token.Loc, "Unterminated angle bracket include - expected '>'");
+            return;
+        }
+        
+        filePath = libraryPath;
+    }
+    // Standard quoted or identifier include
+    else if (pathToken.Type == TokenType::DM_Preproc_ConstantString || 
+             pathToken.Type == TokenType::String || 
+             pathToken.Type == TokenType::Identifier) {
+        // Extract the file path (remove quotes if present)
+        filePath = pathToken.Text;
+        if (filePath.length() >= 2 && filePath.front() == '"' && filePath.back() == '"') {
+            filePath = filePath.substr(1, filePath.length() - 2);
+        }
+    }
+    else {
+        ReportError(token.Loc, "#include directive requires a file path (string, identifier, or <library>)");
         return;
     }
     
-    // Extract the file path (remove quotes if present)
-    std::string filePath = pathToken.Text;
-    if (filePath.length() >= 2 && filePath.front() == '"' && filePath.back() == '"') {
-        filePath = filePath.substr(1, filePath.length() - 2);
-    }
-    
-    // Resolve path relative to current file
-    std::string resolvedPath = filePath;
-    if (!FileStack_.empty()) {
-        std::string currentFile = FileStack_.top().FilePath;
-        namespace fs = std::filesystem;
-        fs::path currentDir = fs::path(currentFile).parent_path();
-        resolvedPath = (currentDir / filePath).string();
+    // Resolve the path
+    std::string resolvedPath;
+    if (isLibraryInclude) {
+        // Resolve library path using library search directories
+        resolvedPath = ResolveLibraryPath(filePath, token.Loc);
+        if (resolvedPath.empty()) {
+            return; // Error already reported by ResolveLibraryPath
+        }
+    } else {
+        // Resolve path relative to current file
+        resolvedPath = filePath;
+        if (!FileStack_.empty()) {
+            std::string currentFile = FileStack_.top().FilePath;
+            namespace fs = std::filesystem;
+            fs::path currentDir = fs::path(currentFile).parent_path();
+            resolvedPath = (currentDir / filePath).string();
+        }
     }
     
     // Check if already included

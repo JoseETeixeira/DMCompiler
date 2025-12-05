@@ -238,6 +238,7 @@ private:
     bool IncludeFile(const std::string& path, const Location& includeLocation);
     std::vector<Token> PreprocessFile(const std::string& path, const Location& includeLocation);
     std::string ResolvePath(const std::string& path, const std::string& currentFile);
+    std::string ResolveLibraryPath(const std::string& libraryPath, const Location& location);
     
     // File stack management (NEW)
     bool PushFile(const std::string& filePath, const Location& includeLocation);
