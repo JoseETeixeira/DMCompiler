@@ -693,16 +693,18 @@ bool DMExpressionCompiler::CompileCall(DMASTCall* expr) {
                     // Check if this is a member proc (not a global proc)
                     if (resolvedProc->OwningObject && resolvedProc->OwningObject != Compiler_->GetObjectTree()->GetRoot()) {
                         // This is a member proc call on src (implicit this)
-                        // Compile as: push src, call method
+                        // Compile as: push src first, then args, then call method
+                        // Stack order must be [object, args...] with last arg on top
+                        // so that VM can pop args then pop object
+                        
+                        // Push src (the current object) FIRST
+                        std::vector<uint8_t> srcRef = { 1 };  // DMReference.Type.Src
+                        Writer_->EmitMulti(DreamProcOpcode::PushReferenceValue, srcRef);
+                        Writer_->ResizeStack(1);  // Pushes src
                         
                         // Compile arguments using helper (supports named arguments)
                         auto args = CompileCallArguments(expr->Parameters);
                         if (!args.success) return false;
-                        
-                        // Push src (the current object)
-                        std::vector<uint8_t> srcRef = { 1 };  // DMReference.Type.Src
-                        Writer_->EmitMulti(DreamProcOpcode::PushReferenceValue, srcRef);
-                        Writer_->ResizeStack(1);  // Pushes src
                         
                         // Call the method
                         Writer_->EmitString(DreamProcOpcode::DereferenceCall, procName);
