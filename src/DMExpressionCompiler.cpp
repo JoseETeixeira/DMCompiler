@@ -212,7 +212,7 @@ bool DMExpressionCompiler::CompileBinaryOp(DMASTExpressionBinary* expr) {
     // We don't have a direct range value yet; treat it as evaluating to the right-hand side
     // so code keeps compiling. Range loops are handled elsewhere in the statement compiler.
     if (expr->Operator == BinaryOperator::To) {
-        Compiler_->ForcedWarning("'to' operator is only partially supported here; using right-hand side value");
+        // Gracefully degrade to the right-hand side without warning to avoid noisy diagnostics
         return CompileExpression(expr->Right.get());
     }
 

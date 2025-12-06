@@ -2498,9 +2498,6 @@ std::unique_ptr<DMASTProcStatement> DMParser::ProcStatementDoWhile() {
     Location loc = CurrentLocation();
     Consume(TokenType::Do, "Expected 'do'");
 
-    std::cout << "[do-while debug] start at " << loc.SourceFile << ":" << loc.Line
-              << ":" << loc.Column << std::endl;
-    
     // Skip whitespace after 'do'
     Whitespace();
     
@@ -2510,8 +2507,6 @@ std::unique_ptr<DMASTProcStatement> DMParser::ProcStatementDoWhile() {
     if (Current().Type != TokenType::Newline &&
         Current().Type != TokenType::Indent &&
         Current().Type != TokenType::LeftCurlyBracket) {
-        std::cout << "[do-while debug] single-line body token type="
-                  << static_cast<int>(Current().Type) << " text='" << Current().Text << "'" << std::endl;
         // Single statement on same line as 'do'
         auto stmt = ProcStatement();
         std::vector<std::unique_ptr<DMASTProcStatement>> stmts;
@@ -2525,12 +2520,8 @@ std::unique_ptr<DMASTProcStatement> DMParser::ProcStatementDoWhile() {
             Advance();
         }
     } else {
-        std::cout << "[do-while debug] block-style body token type="
-                  << static_cast<int>(Current().Type) << " text='" << Current().Text << "'" << std::endl;
         // Block style body - special handling so the trailing 'while' isn't consumed as a body statement
         int baseIndent = loc.Column;
-        std::cout << "[do-while debug] enter block baseIndent=" << baseIndent
-                  << " at " << loc.SourceFile << ":" << loc.Line << ":" << loc.Column << std::endl;
 
         if (Current().Type == TokenType::LeftCurlyBracket) {
             body = ProcBlockInner(baseIndent);
@@ -2554,7 +2545,6 @@ std::unique_ptr<DMASTProcStatement> DMParser::ProcStatementDoWhile() {
             Location lastStmtLoc;
             int stuckLoopCount = 0;
             int firstStmtIndent = -1;
-            bool loggedFirstIndent = false;
 
             while (Current().Type != TokenType::EndOfFile) {
                 while (Current().Type == TokenType::Newline || Current().Type == TokenType::Indent) {
@@ -2570,23 +2560,11 @@ std::unique_ptr<DMASTProcStatement> DMParser::ProcStatementDoWhile() {
                 int currentIndent = GetCurrentIndentation();
                 if (firstStmtIndent == -1 && Current().Type != TokenType::Dedent) {
                     firstStmtIndent = currentIndent;
-                    if (!loggedFirstIndent) {
-                        loggedFirstIndent = true;
-                        std::cout << "[do-while debug] firstStmtIndent=" << firstStmtIndent
-                                  << " token='" << Current().Text << "' at "
-                                  << Current().Loc.SourceFile << ":" << Current().Loc.Line
-                                  << ":" << Current().Loc.Column << std::endl;
-                    }
                 }
 
                 if (Current().Type == TokenType::While ||
                     (IsIdentifierLike(Current().Type) && Current().Text == "while")) {
                     int trailingIndentThreshold = (firstStmtIndent == -1) ? (baseIndent + 1) : firstStmtIndent;
-                    std::cout << "[do-while debug] saw while indent=" << currentIndent
-                              << " threshold=" << trailingIndentThreshold
-                              << " base=" << baseIndent
-                              << " at " << Current().Loc.SourceFile << ":"
-                              << Current().Loc.Line << ":" << Current().Loc.Column << std::endl;
 
                     if (currentIndent < trailingIndentThreshold) {
                         break;
@@ -2600,10 +2578,6 @@ std::unique_ptr<DMASTProcStatement> DMParser::ProcStatementDoWhile() {
                 // Only break when indentation drops below the "do" line; equality can
                 // happen if the lexer reports the same column for the body statements.
                 if (currentIndent < baseIndent) {
-                    std::cout << "[do-while debug] break on indent drop current=" << currentIndent
-                              << " base=" << baseIndent << " at "
-                              << Current().Loc.SourceFile << ":" << Current().Loc.Line
-                              << ":" << Current().Loc.Column << std::endl;
                     break;
                 }
 
