@@ -271,7 +271,7 @@ bool DMCompiler::PreprocessFiles() {
         std::cout << "Phase 1: Preprocessing files..." << std::endl;
     }
 
-    DMPreprocessor preprocessor;
+    DMPreprocessor preprocessor(this);
 
     // Add custom defines from settings
     for (const auto& [name, value] : Settings_.MacroDefines) {

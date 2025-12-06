@@ -45,7 +45,16 @@ protected:
                 return token;
             }
             
-            Location eofLoc = Tokens_.empty() ? Location("", 0, 0) : Tokens_.back().Loc;
+            // EOF should have column 0 (indicates start of a "virtual" line after file end)
+            // This is important for indentation-based parsing
+            Location eofLoc;
+            if (!Tokens_.empty()) {
+                eofLoc = Tokens_.back().Loc;
+                eofLoc.Column = 0;  // Force column 0 for proper dedent handling
+            } else {
+                eofLoc = Location("", 0, 0);
+            }
+            CurrentLocation_ = eofLoc;
             AtEndOfSource_ = true;
             return CreateToken(TokenType::EndOfFile, "");
         }

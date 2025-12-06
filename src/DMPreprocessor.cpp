@@ -98,6 +98,27 @@ DMPreprocessor::DMPreprocessor(DMCompiler* compiler)
 
 DMPreprocessor::~DMPreprocessor() = default;
 
+// Helper function to fix include paths that had escape sequences processed
+// The lexer converts \t to tab, \n to newline, etc. but these are
+// path separators on Windows, not escape sequences!
+static std::string FixIncludePath(const std::string& path) {
+    std::string fixedPath;
+    fixedPath.reserve(path.size());
+    for (size_t i = 0; i < path.size(); ++i) {
+        char c = path[i];
+        if (c == '\t') {
+            fixedPath += "\\t";
+        } else if (c == '\n') {
+            fixedPath += "\\n";
+        } else if (c == '\r') {
+            fixedPath += "\\r";
+        } else {
+            fixedPath += c;
+        }
+    }
+    return fixedPath;
+}
+
 bool DMPreprocessor::Initialize(const std::string& rootFilePath) {
     // Clear all state
     while (!FileStack_.empty()) {
@@ -288,6 +309,8 @@ std::vector<Token> DMPreprocessor::Preprocess(const std::string& filePath) {
         return result;  // Error during initialization
     }
     
+    bool lastWasNewline = true; // Start of file counts as after newline
+    
     // Loop: call GetNextToken() until IsComplete() returns true
     while (!IsComplete()) {
         Token token = GetNextToken();
@@ -296,6 +319,18 @@ std::vector<Token> DMPreprocessor::Preprocess(const std::string& filePath) {
         if (token.Type == TokenType::EndOfFile) {
             break;
         }
+        
+        // Only keep whitespace tokens if they appear after a newline (for indentation tracking)
+        // Skip mid-line whitespace as it's not needed
+        if (token.Type == TokenType::DM_Preproc_Whitespace) {
+            if (!lastWasNewline) {
+                continue; // Skip mid-line whitespace
+            }
+            // Keep leading whitespace for indentation
+        }
+        
+        // Track newlines to know when to keep whitespace
+        lastWasNewline = (token.Type == TokenType::Newline);
         
         // Collect tokens in result vector using move semantics
         result.push_back(std::move(token));
@@ -390,10 +425,11 @@ Token DMPreprocessor::GetNextToken() {
         if (!UnprocessedTokens_.empty()) {
             Token token = UnprocessedTokens_.top();
             UnprocessedTokens_.pop();
-            // Update previous token tracking for non-whitespace tokens
+            // Update tracking for non-whitespace tokens
             if (token.Type != TokenType::DM_Preproc_Whitespace && 
                 token.Type != TokenType::Newline) {
                 PreviousNonWhitespaceToken_ = token.Type;
+                CurrentLineContainsNonWhitespace_ = true;  // This token is non-whitespace content
             }
             return token;
         }
@@ -405,6 +441,11 @@ Token DMPreprocessor::GetNextToken() {
         
         // Step 3: Get token from top lexer using GetNextRawToken()
         Token token = FileStack_.top().Lexer->GetNextToken();
+        
+        // Debug: log all include tokens
+        if (Compiler_ && Compiler_->GetSettings().Verbose && token.Type == TokenType::DM_Preproc_Include) {
+            std::cout << "  Got DM_Preproc_Include token at " << token.Loc.SourceFile << ":" << token.Loc.Line << std::endl;
+        }
         
         // Step 4: Process token based on type
         
@@ -441,6 +482,9 @@ Token DMPreprocessor::GetNextToken() {
         
         // Handle preprocessor directives
         if (token.Type == TokenType::DM_Preproc_Include) {
+            if (Compiler_ && Compiler_->GetSettings().Verbose) {
+                std::cout << "  Processing #include at " << token.Loc.SourceFile << ":" << token.Loc.Line << std::endl;
+            }
             HandleIncludeDirectiveStreaming(token);
             continue; // Don't emit directive tokens
         }
@@ -1111,6 +1155,8 @@ void DMPreprocessor::HandleIncludeDirective(const Token& token) {
         if (filePath.length() >= 2 && filePath.front() == '"' && filePath.back() == '"') {
             filePath = filePath.substr(1, filePath.length() - 2);
         }
+        // Fix escape sequences that were incorrectly processed (e.g., \t -> tab)
+        filePath = FixIncludePath(filePath);
     }
     else {
         ReportError(token.Loc, "#include directive requires a file path (string, identifier, or <library>)");
@@ -1208,7 +1254,7 @@ void DMPreprocessor::HandleDefineDirective(const Token& token) {
             if (dirValue.size() >= 2 && dirValue.front() == '"' && dirValue.back() == '"') {
                 dirValue = dirValue.substr(1, dirValue.size() - 2);
             }
-        } else if (dirToken.Type == TokenType::DM_Preproc_Punctuator_Period) {
+        } else if (dirToken.Type == TokenType::DM_Preproc_Punctuator_Period || dirToken.Type == TokenType::Period) {
             dirValue = ".";
         } else {
             if (Compiler_) {
@@ -1244,16 +1290,22 @@ void DMPreprocessor::HandleDefineDirective(const Token& token) {
     }
     
     // Check for function-like macro
+    // IMPORTANT: For function-like macros, '(' must IMMEDIATELY follow the macro name
+    // with NO whitespace. If there's whitespace, it's an object-like macro and the
+    // '(' is part of the value.
+    // Example: #define FOO(x) x+1   -> function-like macro
+    //          #define FOO (1)      -> object-like macro with value "(1)"
     Token nextToken = GetNextRawToken();
     
     std::vector<std::string> parameters;
     bool isFunctionMacro = false;
     bool foundVariadic = false;
     
-    // Check for '(' - accept both preprocessor and regular token types
+    // Check for '(' IMMEDIATELY after macro name (no whitespace)
+    // Only treat as function-like macro if '(' comes directly after the name
     if (nextToken.Type == TokenType::DM_Preproc_Punctuator_LeftParenthesis ||
         nextToken.Type == TokenType::LeftParenthesis) {
-        // Function-like macro
+        // Function-like macro (no whitespace between name and '(')
         isFunctionMacro = true;
         
         while (true) {
@@ -2086,12 +2138,22 @@ bool DMPreprocessor::IsDirective(TokenType type) const {
 // ============================================================================
 
 void DMPreprocessor::HandleIncludeDirectiveStreaming(const Token& token) {
+    // Debug
+    if (Compiler_ && Compiler_->GetSettings().Verbose) {
+        std::cout << "  HandleIncludeDirectiveStreaming called at " << token.Loc.SourceFile << ":" << token.Loc.Line << std::endl;
+    }
+    
     // Read the file path token
     Token pathToken = GetNextRawToken();
     
     // Skip whitespace
     while (pathToken.Type == TokenType::DM_Preproc_Whitespace) {
         pathToken = GetNextRawToken();
+    }
+    
+    // Debug
+    if (Compiler_ && Compiler_->GetSettings().Verbose) {
+        std::cout << "    Path token type=" << static_cast<int>(pathToken.Type) << " text='" << pathToken.Text << "'" << std::endl;
     }
     
     std::string filePath;
@@ -2128,6 +2190,8 @@ void DMPreprocessor::HandleIncludeDirectiveStreaming(const Token& token) {
         if (filePath.length() >= 2 && filePath.front() == '"' && filePath.back() == '"') {
             filePath = filePath.substr(1, filePath.length() - 2);
         }
+        // Fix escape sequences that were incorrectly processed (e.g., \t -> tab)
+        filePath = FixIncludePath(filePath);
     }
     else {
         ReportError(token.Loc, "#include directive requires a file path (string, identifier, or <library>)");
@@ -2182,6 +2246,11 @@ void DMPreprocessor::HandleIncludeDirectiveStreaming(const Token& token) {
     if (resolvedPath.size() >= 4 && resolvedPath.substr(resolvedPath.size() - 4) == ".dmf") {
         IncludedInterface_ = absolutePath;
         return; // Don't preprocess interface files
+    }
+    
+    // Debug: log included files
+    if (Compiler_ && Compiler_->GetSettings().Verbose) {
+        std::cout << "  Including file: " << absolutePath << std::endl;
     }
     
     // Push the file onto the stack (STREAMING - no token accumulation)

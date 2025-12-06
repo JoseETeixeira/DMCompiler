@@ -70,8 +70,18 @@ Token DMLexer::ParseNextToken() {
         }
     }
     
-    // Skip whitespace (spaces and tabs) - don't emit tokens
+    // Skip whitespace (spaces and tabs) - emit token only if EmitWhitespace_ is true
     if (current == ' ' || current == '\t') {
+        if (EmitWhitespace_) {
+            // Emit whitespace token
+            Location wsLoc = CurrentLocation_;
+            std::string ws;
+            while (!AtEndOfSource_ && (GetCurrent() == ' ' || GetCurrent() == '\t')) {
+                ws += GetCurrent();
+                Advance();
+            }
+            return Token(TokenType::DM_Preproc_Whitespace, ws, wsLoc);
+        }
         SkipWhitespace();
         return ParseNextToken();
     }

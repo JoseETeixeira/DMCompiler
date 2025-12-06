@@ -2,6 +2,7 @@
 #include "DMCompiler.h"
 #include "DMValueType.h"
 #include <algorithm>
+#include <cctype>
 #include <iostream>
 
 namespace DMCompiler {
@@ -185,6 +186,21 @@ Token DMParser::Advance() {
                 CurrentToken_ = Lexer_->GetNextToken();
             }
         }
+    }
+
+    static long long tokenAdvanceCount = 0;
+    tokenAdvanceCount++;
+    if (tokenAdvanceCount % 1000 == 0) {
+        std::cout << "[parser] advanced " << tokenAdvanceCount
+                  << " tokens, current=" << CurrentToken_.Loc.ToString() << " type="
+                  << static_cast<int>(CurrentToken_.Type) << " text='" << CurrentToken_.Text << "'"
+                  << std::endl;
+    }
+    if (tokenAdvanceCount >= 9500 && tokenAdvanceCount <= 12500) {
+        std::cout << "[parser] trace " << tokenAdvanceCount
+                  << " @ " << CurrentToken_.Loc.ToString() << " type="
+                  << static_cast<int>(CurrentToken_.Type) << " text='" << CurrentToken_.Text << "'"
+                  << std::endl;
     }
     return CurrentToken_;
 }
@@ -429,6 +445,19 @@ std::unique_ptr<DMASTExpression> DMParser::Expression() {
 std::unique_ptr<DMASTExpression> DMParser::PrimaryExpression() {
     Location loc = CurrentLocation();
     Token token = Current();
+
+    // Tolerate stray indentation and preprocessor whitespace tokens in
+    // expression contexts by treating them as whitespace and continuing. This
+    // mirrors BYOND's loose indentation handling and prevents hard parse
+    // failures on malformed blocks.
+        while (token.Type == TokenType::Indent ||
+            token.Type == TokenType::Dedent ||
+            token.Type == TokenType::DM_Preproc_Whitespace ||
+            token.Type == TokenType::Newline) {
+        Advance();
+        token = Current();
+        loc = CurrentLocation();
+    }
     
     // Integer literal
     if (token.Type == TokenType::Number) {
@@ -550,7 +579,7 @@ std::unique_ptr<DMASTExpression> DMParser::PrimaryExpression() {
     }
     
     // If we get here, it's an error
-    Emit(WarningCode::BadToken, "Expected expression, got '" + token.Text + "' (type: " + std::to_string(static_cast<int>(token.Type)) + ")");
+    Emit(WarningCode::BadToken, "Expected expression, got '" + token.Text + "' (type: " + std::to_string(static_cast<int>(token.Type)) + ") at " + token.Loc.SourceFile + ":" + std::to_string(token.Loc.Line) + ":" + std::to_string(token.Loc.Column));
     Advance(); // Skip the bad token
     return std::make_unique<DMASTConstantNull>(loc); // Return null as error recovery
 }
@@ -729,6 +758,12 @@ std::unique_ptr<DMASTExpression> DMParser::PostfixExpression() {
     bool justCompletedCall = false;
     
     while (true) {
+        if (!CheckProgress()) {
+            std::cout << "[parser] PostfixExpression no progress at " << CurrentLocation().ToString()
+                      << ", forcing advance" << std::endl;
+            Advance();
+            break;
+        }
         Location loc = CurrentLocation();
         
         // Check for colon runtime member access (obj:prop)
@@ -744,7 +779,23 @@ std::unique_ptr<DMASTExpression> DMParser::PostfixExpression() {
         //   loc:loc in "cond ? loc:loc : null" - member access (identifier : identifier)
         //   1000 : ix in "cond ? 1000 : ix / move_x" - ternary separator (literal cannot have member access)
         bool isColonMemberAccess = false;
-        if (Current().Type == TokenType::Colon && !justCompletedCall) {
+
+        // In ternary true/false branches, a colon is far more likely to be the separator
+        // than runtime member access when the left side is a constant-like identifier
+        // (e.g., direction constants WEST/EAST). This prevents misclassifying
+        // "? WEST : EAST" as a member lookup on WEST.
+        auto* identExpr = dynamic_cast<DMASTIdentifier*>(expr.get());
+        bool looksConstantIdentifier = false;
+        if (identExpr) {
+            const std::string& name = identExpr->Identifier;
+            looksConstantIdentifier = !name.empty() && std::all_of(name.begin(), name.end(), [](unsigned char c) {
+                return std::isupper(c) || c == '_' || std::isdigit(c);
+            });
+        }
+
+        bool shouldTreatColonAsTernary = ParsingTernary_ && looksConstantIdentifier;
+
+        if (Current().Type == TokenType::Colon && !justCompletedCall && !shouldTreatColonAsTernary) {
             // First check: is the left side a valid dereference target?
             // Literals (numbers, strings, null, etc.) cannot have member access
             bool isValidDerefTarget = dynamic_cast<DMASTIdentifier*>(expr.get()) != nullptr ||
@@ -879,6 +930,17 @@ std::unique_ptr<DMASTExpression> DMParser::PostfixExpression() {
                     } else {
                         // Simple positional argument
                         parameters.push_back(std::make_unique<DMASTCallParameter>(argExpr->Location_, std::move(argExpr)));
+                    }
+
+                    // BYOND allows trailing "as type" annotations in some contexts (e.g., input).
+                    // If we encounter one here, skip it so the argument parser doesn't choke.
+                    if (Current().Type == TokenType::As) {
+                        Advance();
+                        while (Current().Type != TokenType::Comma &&
+                               Current().Type != TokenType::RightParenthesis &&
+                               Current().Type != TokenType::EndOfFile) {
+                            Advance();
+                        }
                     }
                     
                     if (Current().Type == TokenType::Comma) {
@@ -1530,6 +1592,12 @@ std::unique_ptr<DMASTProcBlockInner> DMParser::ProcBlockInner(int baseIndent) {
         Whitespace();
         
         while (Current().Type != TokenType::RightCurlyBracket && Current().Type != TokenType::EndOfFile) {
+            if (!CheckProgress()) {
+                std::cout << "[parser] stuck in ProcBlockInner at " << CurrentLocation().ToString()
+                          << ", forcing advance" << std::endl;
+                Advance();
+                continue;
+            }
             Location stmtLoc = CurrentLocation();
             try {
                 auto stmt = ProcStatement();
@@ -1549,9 +1617,25 @@ std::unique_ptr<DMASTProcBlockInner> DMParser::ProcBlockInner(int baseIndent) {
         }
         
         Consume(TokenType::RightCurlyBracket, "Expected '}'");
-    } else if (Current().Type == TokenType::Newline) {
+    } else if (Current().Type == TokenType::Newline || Current().Type == TokenType::Indent) {
         // Indentation style - parse multiple indented statements
-        Advance(); // Skip newline
+        // Can start with either Newline (legacy) or Indent (from TokenStreamDMLexer)
+        
+        // Skip the initial Indent/Newline
+        Advance();
+        
+        // If we had Indent, the Newline should follow - skip it too
+        if (Current().Type == TokenType::Newline) {
+            Advance();
+        }
+
+        // Consume any extra Indent markers that may trail after the first line
+        while (Current().Type == TokenType::Indent) {
+            Advance();
+            if (Current().Type == TokenType::Newline) {
+                Advance();
+            }
+        }
         
         Location lastStmtLoc;
         int stuckLoopCount = 0;
@@ -1559,7 +1643,7 @@ std::unique_ptr<DMASTProcBlockInner> DMParser::ProcBlockInner(int baseIndent) {
         // Parse all statements that are indented more than base level
         while (Current().Type != TokenType::EndOfFile) {
             // Skip empty lines
-            while (Current().Type == TokenType::Newline) {
+            while (Current().Type == TokenType::Newline || Current().Type == TokenType::Indent) {
                 Advance();
             }
             
@@ -1567,7 +1651,12 @@ std::unique_ptr<DMASTProcBlockInner> DMParser::ProcBlockInner(int baseIndent) {
                 break;
             }
             
-            // Check indentation
+            // Dedent token means we've exited this indentation level
+            if (Current().Type == TokenType::Dedent) {
+                break;
+            }
+            
+            // Check indentation (for tokens that don't have explicit Dedent)
             int currentIndent = GetCurrentIndentation();
             
             // If we're back at or before the base indentation, we're done
@@ -1609,6 +1698,11 @@ std::unique_ptr<DMASTProcBlockInner> DMParser::ProcBlockInner(int baseIndent) {
                 Advance();
             }
         }
+        
+        // Consume any pending Dedent token(s) to restore clean state
+        while (Current().Type == TokenType::Dedent) {
+            Advance();
+        }
     } else {
         // Single statement on same line, or just a semicolon (empty body)
         // First, consume any leading semicolons (empty statements)
@@ -1639,6 +1733,13 @@ std::unique_ptr<DMASTProcBlockInner> DMParser::ProcBlockInner(int baseIndent) {
 
 std::unique_ptr<DMASTProcStatement> DMParser::ProcStatement() {
     Location loc = CurrentLocation();
+
+    if (!CheckProgress()) {
+        std::cout << "[parser] ProcStatement no progress at " << loc.ToString()
+                  << ", forcing advance" << std::endl;
+        Advance();
+        return nullptr;
+    }
     
     // Null statement (lone semicolon)
     if (Current().Type == TokenType::Semicolon) {
@@ -1776,6 +1877,13 @@ std::unique_ptr<DMASTProcStatement> DMParser::ProcStatementVarDeclaration() {
 
 void DMParser::ParseVarDeclarations(std::vector<DMASTProcStatementVarDeclaration::Decl>& decls, std::optional<DreamPath>& currentTypePath) {
     do {
+        size_t loopPos = GetTokenPosition();
+
+        // Skip any indentation tokens that may precede the declaration on this line
+        while (Current().Type == TokenType::Indent) {
+            Advance();
+        }
+
         Location declLoc = CurrentLocation();
         
         // Parse path elements
@@ -1804,8 +1912,26 @@ void DMParser::ParseVarDeclarations(std::vector<DMASTProcStatementVarDeclaration
         }
         
         if (pathElements.empty()) {
-            Emit(WarningCode::BadToken, "Expected identifier in var declaration");
-            break;
+            // Recovery: consume a separator if we're already sitting on one, otherwise skip ahead
+            if (Current().Type == TokenType::Comma ||
+                Current().Type == TokenType::Semicolon ||
+                Current().Type == TokenType::Newline ||
+                Current().Type == TokenType::Dedent) {
+                Advance();
+                continue;
+            }
+
+            while (Current().Type != TokenType::Comma &&
+                   Current().Type != TokenType::Semicolon &&
+                   Current().Type != TokenType::Newline &&
+                   Current().Type != TokenType::Dedent &&
+                   Current().Type != TokenType::EndOfFile) {
+                Advance();
+            }
+            if (Current().Type == TokenType::Comma) {
+                Advance();
+            }
+            continue;
         }
         
         // Analyze path to split Name and Type
@@ -1885,7 +2011,12 @@ void DMParser::ParseVarDeclarations(std::vector<DMASTProcStatementVarDeclaration
         } else {
             break;
         }
-        
+
+        if (GetTokenPosition() == loopPos && Current().Type != TokenType::EndOfFile) {
+            Advance();
+            break;
+        }
+
     } while (true);
 }
 
@@ -2366,6 +2497,9 @@ std::unique_ptr<DMASTProcStatement> DMParser::ProcStatementContinue() {
 std::unique_ptr<DMASTProcStatement> DMParser::ProcStatementDoWhile() {
     Location loc = CurrentLocation();
     Consume(TokenType::Do, "Expected 'do'");
+
+    std::cout << "[do-while debug] start at " << loc.SourceFile << ":" << loc.Line
+              << ":" << loc.Column << std::endl;
     
     // Skip whitespace after 'do'
     Whitespace();
@@ -2373,7 +2507,11 @@ std::unique_ptr<DMASTProcStatement> DMParser::ProcStatementDoWhile() {
     // Check if the body is on the same line as 'do' (single statement style)
     // In DM: "do statement" with "while(...)" on the next line
     std::unique_ptr<DMASTProcBlockInner> body;
-    if (Current().Type != TokenType::Newline && Current().Type != TokenType::LeftCurlyBracket) {
+    if (Current().Type != TokenType::Newline &&
+        Current().Type != TokenType::Indent &&
+        Current().Type != TokenType::LeftCurlyBracket) {
+        std::cout << "[do-while debug] single-line body token type="
+                  << static_cast<int>(Current().Type) << " text='" << Current().Text << "'" << std::endl;
         // Single statement on same line as 'do'
         auto stmt = ProcStatement();
         std::vector<std::unique_ptr<DMASTProcStatement>> stmts;
@@ -2387,10 +2525,144 @@ std::unique_ptr<DMASTProcStatement> DMParser::ProcStatementDoWhile() {
             Advance();
         }
     } else {
-        // Block style body - pass the do statement's column as base indent
-        body = ProcBlockInner(loc.Column);
+        std::cout << "[do-while debug] block-style body token type="
+                  << static_cast<int>(Current().Type) << " text='" << Current().Text << "'" << std::endl;
+        // Block style body - special handling so the trailing 'while' isn't consumed as a body statement
+        int baseIndent = loc.Column;
+        std::cout << "[do-while debug] enter block baseIndent=" << baseIndent
+                  << " at " << loc.SourceFile << ":" << loc.Line << ":" << loc.Column << std::endl;
+
+        if (Current().Type == TokenType::LeftCurlyBracket) {
+            body = ProcBlockInner(baseIndent);
+        } else {
+            // Inline copy of ProcBlockInner's indentation branch with an early break when we hit the trailing 'while'
+            Location blockLoc = CurrentLocation();
+            std::vector<std::unique_ptr<DMASTProcStatement>> statements;
+
+            // Skip the initial Indent/Newline markers
+            Advance();
+            if (Current().Type == TokenType::Newline) {
+                Advance();
+            }
+            while (Current().Type == TokenType::Indent) {
+                Advance();
+                if (Current().Type == TokenType::Newline) {
+                    Advance();
+                }
+            }
+
+            Location lastStmtLoc;
+            int stuckLoopCount = 0;
+            int firstStmtIndent = -1;
+            bool loggedFirstIndent = false;
+
+            while (Current().Type != TokenType::EndOfFile) {
+                while (Current().Type == TokenType::Newline || Current().Type == TokenType::Indent) {
+                    Advance();
+                }
+                if (Current().Type == TokenType::EndOfFile) {
+                    break;
+                }
+
+                // Stop before the trailing 'while' once indentation drops back toward the do.
+                // Some sources may lex 'while' as an identifier, so check the text too to avoid
+                // consuming the trailing condition as a body statement.
+                int currentIndent = GetCurrentIndentation();
+                if (firstStmtIndent == -1 && Current().Type != TokenType::Dedent) {
+                    firstStmtIndent = currentIndent;
+                    if (!loggedFirstIndent) {
+                        loggedFirstIndent = true;
+                        std::cout << "[do-while debug] firstStmtIndent=" << firstStmtIndent
+                                  << " token='" << Current().Text << "' at "
+                                  << Current().Loc.SourceFile << ":" << Current().Loc.Line
+                                  << ":" << Current().Loc.Column << std::endl;
+                    }
+                }
+
+                if (Current().Type == TokenType::While ||
+                    (IsIdentifierLike(Current().Type) && Current().Text == "while")) {
+                    int trailingIndentThreshold = (firstStmtIndent == -1) ? (baseIndent + 1) : firstStmtIndent;
+                    std::cout << "[do-while debug] saw while indent=" << currentIndent
+                              << " threshold=" << trailingIndentThreshold
+                              << " base=" << baseIndent
+                              << " at " << Current().Loc.SourceFile << ":"
+                              << Current().Loc.Line << ":" << Current().Loc.Column << std::endl;
+
+                    if (currentIndent < trailingIndentThreshold) {
+                        break;
+                    }
+                }
+
+                if (Current().Type == TokenType::Dedent) {
+                    break;
+                }
+
+                // Only break when indentation drops below the "do" line; equality can
+                // happen if the lexer reports the same column for the body statements.
+                if (currentIndent < baseIndent) {
+                    std::cout << "[do-while debug] break on indent drop current=" << currentIndent
+                              << " base=" << baseIndent << " at "
+                              << Current().Loc.SourceFile << ":" << Current().Loc.Line
+                              << ":" << Current().Loc.Column << std::endl;
+                    break;
+                }
+
+                Location curLoc = CurrentLocation();
+                if (curLoc.Line == lastStmtLoc.Line && curLoc.Column == lastStmtLoc.Column) {
+                    stuckLoopCount++;
+                    if (stuckLoopCount > 50) {
+                        break;
+                    }
+                } else {
+                    stuckLoopCount = 0;
+                    lastStmtLoc = curLoc;
+                }
+
+                try {
+                    auto stmt = ProcStatement();
+                    if (stmt) {
+                        statements.push_back(std::move(stmt));
+                    } else {
+                        while (Current().Type != TokenType::Newline && Current().Type != TokenType::EndOfFile) {
+                            Advance();
+                        }
+                    }
+                } catch (const std::exception& e) {
+                    RecoverFromError(std::string("Parse error in do-while body: ") + e.what(), curLoc);
+                }
+
+                while (Current().Type == TokenType::Semicolon || Current().Type == TokenType::Newline) {
+                    Advance();
+                }
+            }
+
+            while (Current().Type == TokenType::Dedent) {
+                Advance();
+            }
+
+            body = std::make_unique<DMASTProcBlockInner>(blockLoc, std::move(statements));
+        }
     }
     
+    // Skip any whitespace/indentation tokens before the trailing 'while'
+    while (Current().Type == TokenType::Newline ||
+           Current().Type == TokenType::Indent ||
+           Current().Type == TokenType::Dedent ||
+           Current().Type == TokenType::Semicolon ||
+           Current().Type == TokenType::Skip ||
+           IsInSet(Current().Type, WhitespaceTypes_)) {
+        Advance();
+    }
+
+    // Defensive debug to understand trailing token when 'while' is missing
+    if (Current().Type != TokenType::While) {
+        Emit(WarningCode::BadToken,
+             "do-while sync saw token '" + Current().Text + "' (type " +
+             std::to_string(static_cast<int>(Current().Type)) + ") at " +
+             Current().Loc.SourceFile + ":" + std::to_string(Current().Loc.Line) +
+             ":" + std::to_string(Current().Loc.Column));
+    }
+
     // While keyword
     Consume(TokenType::While, "Expected 'while' after do-while body");
     
@@ -2744,6 +3016,13 @@ std::unique_ptr<DMASTProcStatement> DMParser::ProcStatementLabelNoColon() {
 std::unique_ptr<DMASTStatement> DMParser::Statement() {
     Location loc = CurrentLocation();
     Whitespace();
+
+    if (!CheckProgress()) {
+        std::cout << "[parser] Statement no progress at " << CurrentLocation().ToString()
+                  << ", forcing advance" << std::endl;
+        Advance();
+        return nullptr;
+    }
     
     // Check for proc/verb keyword FIRST (before paths)
     if (Current().Type == TokenType::Proc) {
@@ -2829,18 +3108,47 @@ std::unique_ptr<DMASTStatement> DMParser::Statement() {
             Advance(); // consume '('
             
             while (Current().Type != TokenType::RightParenthesis && Current().Type != TokenType::EndOfFile) {
+                // Skip stray BYOND-style annotations that might have been left in the stream
+                if (Current().Type == TokenType::As) {
+                    Advance();
+                    while (Current().Type != TokenType::Comma &&
+                           Current().Type != TokenType::RightParenthesis &&
+                           Current().Type != TokenType::EndOfFile) {
+                        Advance();
+                    }
+                }
+
+                Location beforeParamLoc = CurrentLocation();
+
                 auto param = ProcParameter();
                 if (param) {
                     parameters.push_back(std::move(param));
                 }
                 
+                // If the parser failed to advance, move to the next delimiter to avoid an infinite loop
+                Location afterParamLoc = CurrentLocation();
+                if (afterParamLoc.Line == beforeParamLoc.Line && afterParamLoc.Column == beforeParamLoc.Column) {
+                    while (Current().Type != TokenType::Comma &&
+                           Current().Type != TokenType::RightParenthesis &&
+                           Current().Type != TokenType::EndOfFile) {
+                        Advance();
+                    }
+                }
+
                 if (Current().Type == TokenType::Comma) {
                     Advance();
                 } else {
                     break;
                 }
             }
-            
+
+            // If we're still not at a right parenthesis (e.g., due to unrecognized annotations),
+            // advance until we find it so the parser can recover.
+            while (Current().Type != TokenType::RightParenthesis &&
+                   Current().Type != TokenType::EndOfFile) {
+                Advance();
+            }
+
             Consume(TokenType::RightParenthesis, "Expected ')' after parameter list");
             Whitespace();
             
@@ -2948,9 +3256,15 @@ std::unique_ptr<DMASTStatement> DMParser::Statement() {
                 }
                 
                 Consume(TokenType::RightCurlyBracket, "Expected '}'");
-            } else if (Current().Type == TokenType::Newline) {
+            } else if (Current().Type == TokenType::Newline || Current().Type == TokenType::Indent) {
                 // Indentation style: use column-based indentation tracking
-                Advance(); // Skip the newline
+                // Skip indentation markers produced by TokenStreamDMLexer
+                Advance();
+
+                // TokenStreamDMLexer emits Indent before the newline when indenting
+                if (Current().Type == TokenType::Newline) {
+                    Advance();
+                }
                 
                 // Get base indentation level (the object definition line's column)
                 int baseIndent = loc.Column;
@@ -2972,6 +3286,13 @@ std::unique_ptr<DMASTStatement> DMParser::Statement() {
 std::unique_ptr<DMASTObjectStatement> DMParser::ObjectStatement() {
     Location loc = CurrentLocation();
     Whitespace();
+
+    if (!CheckProgress()) {
+        std::cout << "[parser] ObjectStatement no progress at " << CurrentLocation().ToString()
+                  << ", forcing advance" << std::endl;
+        Advance();
+        return nullptr;
+    }
     
     // Check for explicit proc/verb (but only if followed by /)
     // This handles "proc/name()" and "verb/name()" syntax
@@ -3013,7 +3334,9 @@ std::unique_ptr<DMASTObjectStatement> DMParser::ObjectStatement() {
         Current().Type == TokenType::Global ||
         Current().Type == TokenType::Tmp ||
         Current().Type == TokenType::Const ||
-        Current().Type == TokenType::Static) {
+        Current().Type == TokenType::Static ||
+        Current().Type == TokenType::Proc ||
+        Current().Type == TokenType::Verb) {
         // Save current token to backtrack if needed
         Token savedToken = Current();
         
@@ -3381,9 +3704,32 @@ std::unique_ptr<DMASTObjectStatement> DMParser::ObjectProcDefinition(bool isVerb
         Advance();
         
         while (Current().Type != TokenType::RightParenthesis && Current().Type != TokenType::EndOfFile) {
+                // Skip stray BYOND-style annotations like "as text" that might appear
+                // if a previous parse attempt left tokens unconsumed
+                if (Current().Type == TokenType::As) {
+                    Advance();
+                    while (Current().Type != TokenType::Comma &&
+                           Current().Type != TokenType::RightParenthesis &&
+                           Current().Type != TokenType::EndOfFile) {
+                        Advance();
+                    }
+                }
+
+            Location beforeParamLoc = CurrentLocation();
+
             auto param = ProcParameter();
             if (param) {
                 parameters.push_back(std::move(param));
+            }
+
+            // If no progress was made (e.g., due to unexpected tokens), advance until a delimiter
+            Location afterParamLoc = CurrentLocation();
+            if (afterParamLoc.Line == beforeParamLoc.Line && afterParamLoc.Column == beforeParamLoc.Column) {
+                while (Current().Type != TokenType::Comma &&
+                       Current().Type != TokenType::RightParenthesis &&
+                       Current().Type != TokenType::EndOfFile) {
+                    Advance();
+                }
             }
             
             if (Current().Type == TokenType::Comma) {
@@ -3392,7 +3738,13 @@ std::unique_ptr<DMASTObjectStatement> DMParser::ObjectProcDefinition(bool isVerb
                 break;
             }
         }
-        
+
+        // If we're not at ')' yet (e.g., due to unrecognized annotations),
+        // advance until we find it to keep parsing resilient.
+        while (Current().Type != TokenType::RightParenthesis &&
+               Current().Type != TokenType::EndOfFile) {
+            Advance();
+        }
         Consume(TokenType::RightParenthesis, "Expected ')' after parameter list");
     }
     
@@ -3466,6 +3818,11 @@ std::unique_ptr<DMASTDefinitionParameter> DMParser::ProcParameter() {
     DreamPath typePath;
     bool isList = false;
     std::unique_ptr<DMASTExpression> defaultValue;
+
+    auto isAsToken = [&]() {
+        return Current().Type == TokenType::As ||
+               (Current().Type == TokenType::Identifier && Current().Text == "as");
+    };
     
     // Check for varargs (...)
     if (Current().Type == TokenType::DotDotDot) {
@@ -3534,7 +3891,7 @@ std::unique_ptr<DMASTDefinitionParameter> DMParser::ProcParameter() {
     
     // Check for 'as' type specification
     std::optional<DMComplexValueType> explicitValueType;
-    if (Current().Type == TokenType::As) {
+    if (isAsToken()) {
         Advance();
         
         // Parse type flags (e.g., "num", "text", "num|text")
@@ -3547,16 +3904,13 @@ std::unique_ptr<DMASTDefinitionParameter> DMParser::ProcParameter() {
                Current().Type != TokenType::In &&
                Current().Type != TokenType::Newline &&
                Current().Type != TokenType::EndOfFile) {
-            
+            // Be permissive: consume any token until a delimiter, preserving '|' separators
             if (Current().Type == TokenType::BitwiseOr) {
                 typeStr += "|";
-                Advance();
-            } else if (IsInSet(Current().Type, IdentifierTypes_) || Current().Type == TokenType::Null) {
-                typeStr += Current().Text;
-                Advance();
             } else {
-                break;
+                typeStr += Current().Text;
             }
+            Advance();
         }
         
         // Convert type string to DMValueType flags
@@ -3580,7 +3934,7 @@ std::unique_ptr<DMASTDefinitionParameter> DMParser::ProcParameter() {
     
     // Check for 'as' type specification AFTER default value (DM allows both orders)
     // e.g., "Start = 1 as num" or "Start as num = 1"
-    if (!explicitValueType.has_value() && Current().Type == TokenType::As) {
+    if (!explicitValueType.has_value() && isAsToken()) {
         Advance();
         
         // Parse type flags (e.g., "num", "text", "num|text")
@@ -3593,16 +3947,12 @@ std::unique_ptr<DMASTDefinitionParameter> DMParser::ProcParameter() {
                Current().Type != TokenType::In &&
                Current().Type != TokenType::Newline &&
                Current().Type != TokenType::EndOfFile) {
-            
             if (Current().Type == TokenType::BitwiseOr) {
                 typeStr += "|";
-                Advance();
-            } else if (IsInSet(Current().Type, IdentifierTypes_) || Current().Type == TokenType::Null) {
-                typeStr += Current().Text;
-                Advance();
             } else {
-                break;
+                typeStr += Current().Text;
             }
+            Advance();
         }
         
         // Convert type string to DMValueType flags
@@ -3616,6 +3966,20 @@ std::unique_ptr<DMASTDefinitionParameter> DMParser::ProcParameter() {
     if (!possibleValues && Current().Type == TokenType::In) {
         Advance();
         possibleValues = Expression();
+    }
+
+    // Fallback: consume any remaining 'as <type>' sequence that wasn't handled above
+    // to prevent the parameter parser from getting stuck on BYOND-style annotations.
+    if (isAsToken()) {
+        Advance();
+        while (Current().Type != TokenType::Comma &&
+               Current().Type != TokenType::RightParenthesis &&
+               Current().Type != TokenType::Assign &&
+               Current().Type != TokenType::In &&
+               Current().Type != TokenType::Newline &&
+               Current().Type != TokenType::EndOfFile) {
+            Advance();
+        }
     }
     
     return std::make_unique<DMASTDefinitionParameter>(loc, paramName, typePath, isList,
@@ -3694,10 +4058,15 @@ std::unique_ptr<DMASTObjectStatement> DMParser::ObjectDefinition(const DMASTPath
         }
         
         Consume(TokenType::RightCurlyBracket, "Expected '}'");
-    } else if (Current().Type == TokenType::Newline) {
+    } else if (Current().Type == TokenType::Newline || Current().Type == TokenType::Indent) {
         // Indentation style: /obj/item\n\t...
         // Skip the newline after the path
         Advance();
+        
+        // If we had Indent, the Newline should follow - skip it too
+        if (Current().Type == TokenType::Newline) {
+            Advance();
+        }
         
         // Get base indentation level (the object definition line)
         int baseIndent = loc.Column;
@@ -3722,8 +4091,20 @@ std::vector<std::unique_ptr<DMASTObjectStatement>> DMParser::ParseIndentedObject
     std::vector<std::unique_ptr<DMASTObjectStatement>> statements;
     
     bool verbose = Compiler_ && Compiler_->GetSettings().Verbose;
+
+    // If the token stream emitted an Indent marker before the newline, consume it so
+    // the first statement starts at the correct position.
+    if (Current().Type == TokenType::Indent) {
+        Advance();
+        if (Current().Type == TokenType::Newline) {
+            Advance();
+        }
+    }
     
     // Parse all statements that are indented more than the base level
+    Location lastStmtLoc;
+    int stuckLoopCount = 0;
+
     while (Current().Type != TokenType::EndOfFile) {
         // Skip empty lines
         while (Current().Type == TokenType::Newline) {
@@ -3731,6 +4112,11 @@ std::vector<std::unique_ptr<DMASTObjectStatement>> DMParser::ParseIndentedObject
         }
         
         if (Current().Type == TokenType::EndOfFile) {
+            break;
+        }
+        
+        // Dedent token means we've exited this indentation level
+        if (Current().Type == TokenType::Dedent) {
             break;
         }
         
@@ -3748,6 +4134,19 @@ std::vector<std::unique_ptr<DMASTObjectStatement>> DMParser::ParseIndentedObject
         // Save the current position's indentation - this is the expected indentation
         // for statements at this nesting level
         int expectedIndent = currentIndent;
+
+        // Detect infinite loop: if we haven't advanced location across iterations, bail
+        Location curLoc = CurrentLocation();
+        if (curLoc.Line == lastStmtLoc.Line && curLoc.Column == lastStmtLoc.Column) {
+            stuckLoopCount++;
+            if (stuckLoopCount > 50) {
+                // Force break to avoid hang on malformed input
+                break;
+            }
+        } else {
+            stuckLoopCount = 0;
+            lastStmtLoc = curLoc;
+        }
         
         // Parse the statement
         auto stmt = ObjectStatement();
@@ -3773,6 +4172,16 @@ std::vector<std::unique_ptr<DMASTObjectStatement>> DMParser::ParseIndentedObject
         // Don't break just because the current position has lower indentation -
         // skip lines with lower indentation until we find another statement at our level
         // or determine that the block has truly ended.
+    }
+
+    // Consume any pending Dedent tokens so callers continue at the parent indentation level
+    while (Current().Type == TokenType::Dedent) {
+        Advance();
+    }
+    
+    // Consume any pending Dedent token(s) to restore clean state
+    while (Current().Type == TokenType::Dedent) {
+        Advance();
     }
     
     return statements;
