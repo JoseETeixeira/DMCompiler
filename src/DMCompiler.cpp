@@ -857,6 +857,9 @@ bool DMCompiler::EmitBytecode() {
         
         // Create bytecode writer
         BytecodeWriter writer;
+        writer.SetStringIdProvider([this](const std::string& s) {
+            return ObjectTree_ ? ObjectTree_->AddString(s) : 0;
+        });
         
         // Create expression compiler
         DMExpressionCompiler exprCompiler(this, proc.get(), &writer);
@@ -878,6 +881,9 @@ bool DMCompiler::EmitBytecode() {
                 
                 // Create a fresh writer for the stub
                 BytecodeWriter stubWriter;
+                stubWriter.SetStringIdProvider([this](const std::string& s) {
+                    return ObjectTree_ ? ObjectTree_->AddString(s) : 0;
+                });
                 stubWriter.Emit(DreamProcOpcode::PushNull);
                 stubWriter.ResizeStack(1);
                 stubWriter.Emit(DreamProcOpcode::Return);

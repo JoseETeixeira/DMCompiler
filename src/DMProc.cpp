@@ -314,6 +314,10 @@ void DMProc::Compile(DMCompiler* compiler) {
         }
         
         BytecodeWriter writer;
+        writer.SetStringIdProvider([compiler](const std::string& s) {
+            DMObjectTree* tree = compiler ? compiler->GetObjectTree() : nullptr;
+            return tree ? tree->AddString(s) : 0;
+        });
         DMExpressionCompiler exprCompiler(compiler, this, &writer);
         
         // 1. Call parent's init proc if it exists
@@ -419,6 +423,10 @@ void DMProc::Compile(DMCompiler* compiler) {
     
     // Create bytecode writer and compilers
     BytecodeWriter writer;
+    writer.SetStringIdProvider([compiler](const std::string& s) {
+        DMObjectTree* tree = compiler ? compiler->GetObjectTree() : nullptr;
+        return tree ? tree->AddString(s) : 0;
+    });
     DMExpressionCompiler exprCompiler(compiler, this, &writer);
     DMStatementCompiler stmtCompiler(compiler, this, &writer, &exprCompiler);
     

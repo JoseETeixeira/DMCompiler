@@ -8,6 +8,7 @@
 #include <string>
 #include <unordered_map>
 #include <optional>
+#include <functional>
 
 namespace DMCompiler {
 
@@ -18,6 +19,8 @@ namespace DMCompiler {
 class BytecodeWriter {
 public:
     BytecodeWriter();
+
+    void SetStringIdProvider(std::function<int(const std::string&)> provider);
     
     /// <summary>
     /// Emit a simple opcode with no operands.
@@ -199,6 +202,8 @@ private:
     /// </summary>
     std::unordered_map<std::string, int> StringTable_;
     std::vector<std::string> Strings_;
+
+    std::function<int(const std::string&)> StringIdProvider_;
     
     /// <summary>
     /// Label tracking for jump instructions.

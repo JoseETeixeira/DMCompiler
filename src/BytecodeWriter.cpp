@@ -11,6 +11,10 @@ BytecodeWriter::BytecodeWriter()
     , MaxStackSize_(0) {
 }
 
+void BytecodeWriter::SetStringIdProvider(std::function<int(const std::string&)> provider) {
+    StringIdProvider_ = std::move(provider);
+}
+
 void BytecodeWriter::Emit(DreamProcOpcode opcode) {
     WriteByte(static_cast<uint8_t>(opcode));
 }
@@ -107,6 +111,10 @@ void BytecodeWriter::Finalize() {
 }
 
 int BytecodeWriter::GetStringId(const std::string& str) {
+    if (StringIdProvider_) {
+        return StringIdProvider_(str);
+    }
+
     auto it = StringTable_.find(str);
     if (it != StringTable_.end()) {
         return it->second;

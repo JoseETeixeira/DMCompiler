@@ -1524,23 +1524,33 @@ bool DMExpressionCompiler::CompileNewPath(DMASTNewPath* expr) {
     if (!expr->Path) {
         // Check if we have an expected type from the assignment/declaration context
         if (ExpectedType_) {
-            // Use the inferred type - push it as a path constant
-            // We need to ensure we use an absolute path format for type lookup
-            // Relative paths like "list" from "var/list/X" need to become "/list"
-            std::string typePath;
-            if (ExpectedType_->GetPathType() == DreamPath::PathType::Relative) {
-                // Convert relative path to absolute format
-                typePath = "/";
-                const auto& elements = ExpectedType_->GetElements();
-                for (size_t i = 0; i < elements.size(); ++i) {
-                    if (i > 0) typePath += "/";
-                    typePath += elements[i];
-                }
-            } else {
-                typePath = ExpectedType_->ToString();
+            // Use the inferred type and resolve it to a type table ID.
+            // IMPORTANT: PushType expects a type ID (index into Types), not a string index.
+            DreamPath dreamPath = *ExpectedType_;
+            if (dreamPath.GetPathType() == DreamPath::PathType::Relative) {
+                dreamPath = DreamPath(DreamPath::PathType::Absolute, dreamPath.GetElements());
             }
-            int typeId = Compiler_->GetObjectTree()->AddString(typePath);
-            Writer_->EmitInt(DreamProcOpcode::PushType, typeId);
+
+            DMObject* context = (Proc_ && Proc_->OwningObject) ? Proc_->OwningObject : nullptr;
+            DMObject* typeObj = Compiler_->GetObjectTree()->GetType(dreamPath, context);
+            if (typeObj == nullptr) {
+                // Try from root context as a fallback
+                DMObject* root = Compiler_->GetObjectTree()->GetRoot();
+                if (root && root != context) {
+                    typeObj = Compiler_->GetObjectTree()->GetType(dreamPath, root);
+                }
+            }
+
+            if (typeObj == nullptr) {
+                std::cerr << "Warning: " << expr->Location_.ToString()
+                          << ": Bare 'new' inferred type '" << dreamPath.ToString()
+                          << "' could not be resolved" << std::endl;
+                Writer_->Emit(DreamProcOpcode::PushNull);
+                Writer_->ResizeStack(1);
+                return true;
+            }
+
+            Writer_->EmitInt(DreamProcOpcode::PushType, typeObj->Id);
             Writer_->ResizeStack(1);
             
             // Compile arguments and push them onto the stack
@@ -1554,12 +1564,12 @@ bool DMExpressionCompiler::CompileNewPath(DMASTNewPath* expr) {
             
             // Determine argument type
             DMCallArgumentsType argType = (argCount == 0) ? DMCallArgumentsType::None : DMCallArgumentsType::FromStack;
-            
-            // Emit CreateObject opcode with argument type and stack size
-            std::vector<uint8_t> operands;
-            operands.push_back(static_cast<uint8_t>(argType));
-            operands.push_back(static_cast<uint8_t>(argCount));
-            Writer_->EmitMulti(DreamProcOpcode::CreateObject, operands);
+
+            // Emit CreateObject opcode with argument type and stack delta (int32)
+            // Format: CreateObject <DMCallArgumentsType (byte)> <StackDelta (int32)>
+            Writer_->Emit(DreamProcOpcode::CreateObject);
+            Writer_->AppendByte(static_cast<uint8_t>(argType));
+            Writer_->AppendInt(argCount);
             
             // CreateObject pops args + type, pushes result.
             // Stack change: -argCount - 1 + 1 = -argCount.
@@ -1592,12 +1602,12 @@ bool DMExpressionCompiler::CompileNewPath(DMASTNewPath* expr) {
     
     // Determine argument type
     DMCallArgumentsType argType = (argCount == 0) ? DMCallArgumentsType::None : DMCallArgumentsType::FromStack;
-    
-    // Emit CreateObject opcode with argument type and stack size
-    std::vector<uint8_t> operands;
-    operands.push_back(static_cast<uint8_t>(argType));
-    operands.push_back(static_cast<uint8_t>(argCount));
-    Writer_->EmitMulti(DreamProcOpcode::CreateObject, operands);
+
+    // Emit CreateObject opcode with argument type and stack delta (int32)
+    // Format: CreateObject <DMCallArgumentsType (byte)> <StackDelta (int32)>
+    Writer_->Emit(DreamProcOpcode::CreateObject);
+    Writer_->AppendByte(static_cast<uint8_t>(argType));
+    Writer_->AppendInt(argCount);
     
     // CreateObject pops args + type, pushes result.
     // Stack change: -argCount - 1 + 1 = -argCount.
