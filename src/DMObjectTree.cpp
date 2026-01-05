@@ -476,8 +476,13 @@ DMProc* DMObjectTree::AddProc(const DreamPath& owner, DMASTObjectProcDefinition*
     // Add the proc to the object
     ownerObj->AddProc(proc->Id, procDef->Name);
     
-    // If it's a global proc (owned by root), register it
-    if (owner == DreamPath::Root) {
+    // Global procs are stored under /proc in DM, but can be called unqualified.
+    // Depending on where the proc block is declared, the parser can represent it as either
+    // absolute (/proc) or relative (.proc). Treat both as global.
+    const auto& ownerElems = owner.GetElements();
+    const bool isProcContainer = (ownerElems.size() == 1 && ownerElems[0] == "proc");
+    const bool isVerbContainer = (ownerElems.size() == 1 && ownerElems[0] == "verb");
+    if (owner == DreamPath::Root || isProcContainer || isVerbContainer) {
         RegisterGlobalProc(procDef->Name, proc->Id);
     }
 

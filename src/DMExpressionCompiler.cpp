@@ -359,6 +359,17 @@ bool DMExpressionCompiler::CompileIdentifier(DMASTIdentifier* expr) {
         Writer_->ResizeStack(1);  // Pushes 1 value onto stack
         return true;
     }
+
+    // Check if this identifier resolves to a proc (type proc override or global proc).
+    // This is required so that calls like `newBeam(...)` compile correctly.
+    if (Proc_) {
+        DMObject* owningObject = Proc_->OwningObject;
+        if (DMProc* proc = Compiler_->GetObjectTree()->GetProc(owningObject, name)) {
+            Writer_->EmitInt(DreamProcOpcode::PushProc, proc->Id);
+            Writer_->ResizeStack(1);
+            return true;
+        }
+    }
     
     // Unknown identifier - treat as implicit field access on src if we have an owning object
     // This matches DM semantics: accessing 'stunned' in a /mob proc means 'src.stunned'
@@ -1524,6 +1535,15 @@ bool DMExpressionCompiler::CompileNewPath(DMASTNewPath* expr) {
     if (!expr->Path) {
         // Check if we have an expected type from the assignment/declaration context
         if (ExpectedType_) {
+            // Compile arguments and push them onto the stack
+            int argCount = 0;
+            for (const auto& param : expr->Parameters) {
+                if (!CompileExpression(param->Value.get())) {
+                    return false;
+                }
+                argCount++;
+            }
+
             // Use the inferred type and resolve it to a type table ID.
             // IMPORTANT: PushType expects a type ID (index into Types), not a string index.
             DreamPath dreamPath = *ExpectedType_;
@@ -1550,17 +1570,10 @@ bool DMExpressionCompiler::CompileNewPath(DMASTNewPath* expr) {
                 return true;
             }
 
+            // CreateObject expects type on top of stack.
+            // Stack layout: [args...] [type]
             Writer_->EmitInt(DreamProcOpcode::PushType, typeObj->Id);
             Writer_->ResizeStack(1);
-            
-            // Compile arguments and push them onto the stack
-            int argCount = 0;
-            for (const auto& param : expr->Parameters) {
-                if (!CompileExpression(param->Value.get())) {
-                    return false;
-                }
-                argCount++;
-            }
             
             // Determine argument type
             DMCallArgumentsType argType = (argCount == 0) ? DMCallArgumentsType::None : DMCallArgumentsType::FromStack;
@@ -1586,11 +1599,6 @@ bool DMExpressionCompiler::CompileNewPath(DMASTNewPath* expr) {
         }
     }
     
-    // Compile the type expression (pushes type/path onto stack)
-    if (!CompileExpression(expr->Path.get())) {
-        return false;
-    }
-    
     // Compile arguments and push them onto the stack
     int argCount = 0;
     for (const auto& param : expr->Parameters) {
@@ -1598,6 +1606,13 @@ bool DMExpressionCompiler::CompileNewPath(DMASTNewPath* expr) {
             return false;
         }
         argCount++;
+    }
+
+    // Compile the type expression (pushes type/path onto stack)
+    // CreateObject expects type on top of stack.
+    // Stack layout: [args...] [type]
+    if (!CompileExpression(expr->Path.get())) {
+        return false;
     }
     
     // Determine argument type
