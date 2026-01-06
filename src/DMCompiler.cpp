@@ -22,6 +22,7 @@
 #include <sstream>
 #include <filesystem>
 #include <chrono>
+#include <unordered_set>
 
 // Platform-specific includes for executable path
 #ifdef _WIN32
@@ -393,6 +394,7 @@ bool DMCompiler::PreprocessFiles() {
 
     // Store the included maps and interface from preprocessor
     IncludedMaps_ = preprocessor.GetIncludedMaps();
+    IncludedInterfaces_ = preprocessor.GetIncludedInterfaces();
     IncludedInterface_ = preprocessor.GetIncludedInterface();
     
     if (Settings_.Verbose) {
@@ -953,6 +955,36 @@ bool DMCompiler::OutputJson(const std::string& outputPath) {
     
     JsonWriter json;
     json.BeginObject();
+
+    // Interface metadata (if any .dmf was included)
+    if (!IncludedInterfaces_.empty()) {
+        std::unordered_set<std::string> uniqueInterfaces(IncludedInterfaces_.begin(), IncludedInterfaces_.end());
+
+        std::error_code baseEc;
+        fs::path baseDir = fs::absolute(fs::path(outputPath), baseEc).parent_path();
+        if (baseEc || baseDir.empty()) {
+            baseDir = fs::current_path();
+        }
+        fs::path interfaceAbs = fs::path(IncludedInterfaces_.back());
+        fs::path interfaceRel;
+        {
+            std::error_code ec;
+            interfaceRel = fs::relative(interfaceAbs, baseDir, ec);
+            if (ec || interfaceRel.empty()) {
+                interfaceRel = interfaceAbs.filename();
+                ForcedWarning("Failed to make interface path relative; using filename: " + interfaceRel.generic_string());
+            }
+        }
+
+        if (uniqueInterfaces.size() > 1) {
+            ForcedWarning("Multiple interface files (.dmf) were included; using last: " + interfaceRel.generic_string());
+        }
+
+        json.WriteKey("Interface");
+        json.BeginObject();
+        json.WriteKeyValue("File", interfaceRel.generic_string());
+        json.EndObject();
+    }
     
     // Metadata
     json.WriteKey("Metadata");

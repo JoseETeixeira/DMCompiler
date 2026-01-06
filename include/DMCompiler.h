@@ -146,6 +146,7 @@ private:
     
     // Preprocessor results
     std::vector<std::string> IncludedMaps_;
+    std::vector<std::string> IncludedInterfaces_;
     std::string IncludedInterface_;
     
     // Parsed maps

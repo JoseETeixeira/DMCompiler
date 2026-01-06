@@ -136,6 +136,7 @@ bool DMPreprocessor::Initialize(const std::string& rootFilePath) {
     
     IncludedFiles_.clear();
     IncludedMaps_.clear();
+    IncludedInterfaces_.clear();
     IncludedInterface_.clear();
     IncludeChain_.clear();
     PathCache_.clear();
@@ -737,6 +738,7 @@ bool DMPreprocessor::IncludeFile(const std::string& path, const Location& includ
     
     // Track .dmf files  
     if (path.size() >= 4 && path.substr(path.size() - 4) == ".dmf") {
+        IncludedInterfaces_.push_back(absolutePath);
         IncludedInterface_ = absolutePath;
     }
     
@@ -842,6 +844,7 @@ std::vector<Token> DMPreprocessor::PreprocessFile(const std::string& path, const
     
     // Track .dmf files  
     if (path.size() >= 4 && path.substr(path.size() - 4) == ".dmf") {
+        IncludedInterfaces_.push_back(absolutePath);
         IncludedInterface_ = absolutePath;
         // Don't preprocess interface files, just mark them as included
         return result;
@@ -1209,6 +1212,7 @@ void DMPreprocessor::HandleIncludeDirective(const Token& token) {
     }
     
     if (resolvedPath.size() >= 4 && resolvedPath.substr(resolvedPath.size() - 4) == ".dmf") {
+        IncludedInterfaces_.push_back(absolutePath);
         IncludedInterface_ = absolutePath;
         return; // Don't preprocess interface files
     }
@@ -2244,6 +2248,7 @@ void DMPreprocessor::HandleIncludeDirectiveStreaming(const Token& token) {
     }
     
     if (resolvedPath.size() >= 4 && resolvedPath.substr(resolvedPath.size() - 4) == ".dmf") {
+        IncludedInterfaces_.push_back(absolutePath);
         IncludedInterface_ = absolutePath;
         return; // Don't preprocess interface files
     }

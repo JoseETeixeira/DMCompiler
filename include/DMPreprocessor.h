@@ -157,6 +157,7 @@ public:
     
     // Include tracking
     std::vector<std::string> GetIncludedMaps() const { return IncludedMaps_; }
+    std::vector<std::string> GetIncludedInterfaces() const { return IncludedInterfaces_; }
     std::string GetIncludedInterface() const { return IncludedInterface_; }
     
     // Define management
@@ -171,6 +172,7 @@ private:
     DMCompiler* Compiler_;
     
     std::vector<std::string> IncludedMaps_;
+    std::vector<std::string> IncludedInterfaces_;
     std::string IncludedInterface_;
     
     // File stack for nested includes (NEW - replaces LexerStack_)
