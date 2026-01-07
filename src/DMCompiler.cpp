@@ -1089,7 +1089,7 @@ bool DMCompiler::OutputJson(const std::string& outputPath) {
         }
         
         // Variables (merge Variables and VariableOverrides)
-        // VariableOverrides contains values for inherited variables like icon = 'path.dmi'
+        // VariableOverrides contains values for inherited variables (and sometimes same-type overrides)
         if (!obj->Variables.empty() || !obj->VariableOverrides.empty()) {
             json.WriteKey("Variables");
             json.BeginObject();
@@ -1097,11 +1097,18 @@ bool DMCompiler::OutputJson(const std::string& outputPath) {
             // First write base variable definitions
             for (const auto& [name, var] : obj->Variables) {
                 json.WriteKey(name);
-                
+
+                // If there's an override for this variable name, it should win.
+                const DMVariable* effectiveVar = &var;
+                auto overrideIt = obj->VariableOverrides.find(name);
+                if (overrideIt != obj->VariableOverrides.end()) {
+                    effectiveVar = &overrideIt->second;
+                }
+
                 // Try to serialize the default value
-                if (var.Value) {
+                if (effectiveVar->Value) {
                     JsonValue jsonValue;
-                    if (var.Value->TryAsJsonRepresentation(this, jsonValue)) {
+                    if (effectiveVar->Value->TryAsJsonRepresentation(this, jsonValue)) {
                         json.WriteValue(jsonValue);
                     } else {
                         json.WriteNull();
