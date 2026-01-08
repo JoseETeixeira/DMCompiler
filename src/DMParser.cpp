@@ -767,8 +767,13 @@ std::unique_ptr<DMASTExpression> DMParser::PostfixExpression() {
     
     while (true) {
         if (!CheckProgress()) {
-            std::cout << "[parser] PostfixExpression no progress at " << CurrentLocation().ToString()
-                      << ", forcing advance" << std::endl;
+            if (Compiler_) {
+                const auto& settings = Compiler_->GetSettings();
+                if (settings.Verbose || settings.ParserTrace || settings.ParserProgress) {
+                    std::cout << "[parser] PostfixExpression no progress at " << CurrentLocation().ToString()
+                              << ", forcing advance" << std::endl;
+                }
+            }
             Advance();
             break;
         }
@@ -1601,8 +1606,13 @@ std::unique_ptr<DMASTProcBlockInner> DMParser::ProcBlockInner(int baseIndent) {
         
         while (Current().Type != TokenType::RightCurlyBracket && Current().Type != TokenType::EndOfFile) {
             if (!CheckProgress()) {
-                std::cout << "[parser] stuck in ProcBlockInner at " << CurrentLocation().ToString()
-                          << ", forcing advance" << std::endl;
+                if (Compiler_) {
+                    const auto& settings = Compiler_->GetSettings();
+                    if (settings.Verbose || settings.ParserTrace || settings.ParserProgress) {
+                        std::cout << "[parser] stuck in ProcBlockInner at " << CurrentLocation().ToString()
+                                  << ", forcing advance" << std::endl;
+                    }
+                }
                 Advance();
                 continue;
             }
@@ -1743,8 +1753,13 @@ std::unique_ptr<DMASTProcStatement> DMParser::ProcStatement() {
     Location loc = CurrentLocation();
 
     if (!CheckProgress()) {
-        std::cout << "[parser] ProcStatement no progress at " << loc.ToString()
-                  << ", forcing advance" << std::endl;
+        if (Compiler_) {
+            const auto& settings = Compiler_->GetSettings();
+            if (settings.Verbose || settings.ParserTrace || settings.ParserProgress) {
+                std::cout << "[parser] ProcStatement no progress at " << loc.ToString()
+                          << ", forcing advance" << std::endl;
+            }
+        }
         Advance();
         return nullptr;
     }
@@ -3000,8 +3015,13 @@ std::unique_ptr<DMASTStatement> DMParser::Statement() {
     Whitespace();
 
     if (!CheckProgress()) {
-        std::cout << "[parser] Statement no progress at " << CurrentLocation().ToString()
-                  << ", forcing advance" << std::endl;
+        if (Compiler_) {
+            const auto& settings = Compiler_->GetSettings();
+            if (settings.Verbose || settings.ParserTrace || settings.ParserProgress) {
+                std::cout << "[parser] Statement no progress at " << CurrentLocation().ToString()
+                          << ", forcing advance" << std::endl;
+            }
+        }
         Advance();
         return nullptr;
     }
@@ -3270,8 +3290,13 @@ std::unique_ptr<DMASTObjectStatement> DMParser::ObjectStatement() {
     Whitespace();
 
     if (!CheckProgress()) {
-        std::cout << "[parser] ObjectStatement no progress at " << CurrentLocation().ToString()
-                  << ", forcing advance" << std::endl;
+        if (Compiler_) {
+            const auto& settings = Compiler_->GetSettings();
+            if (settings.Verbose || settings.ParserTrace || settings.ParserProgress) {
+                std::cout << "[parser] ObjectStatement no progress at " << CurrentLocation().ToString()
+                          << ", forcing advance" << std::endl;
+            }
+        }
         Advance();
         return nullptr;
     }
