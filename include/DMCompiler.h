@@ -41,6 +41,10 @@ struct DMCompilerSettings {
     bool Verbose = false;
     bool NoticesEnabled = false;
     bool NoOpts = false;
+
+    // Debug-only parser tracing (very noisy). Off by default.
+    bool ParserProgress = false; // Prints periodic token-advance progress
+    bool ParserTrace = false;    // Prints every token in a configured window
 };
 
 /// <summary>

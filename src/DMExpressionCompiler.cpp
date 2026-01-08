@@ -1401,8 +1401,14 @@ DMExpressionCompiler::LValueInfo DMExpressionCompiler::ResolveLValue(DMASTExpres
             // Attempt to resolve the base expression's type for type inference
             auto baseType = ResolveExpressionType(deref->Expression.get());
             if (baseType) {
+                DreamPath baseTypePath = *baseType;
+                if (baseTypePath.GetPathType() == DreamPath::PathType::Relative) {
+                    baseTypePath = DreamPath(DreamPath::PathType::Absolute, baseTypePath.GetElements());
+                }
+
                 // Look up the field on that type
-                DMObject* baseObj = Compiler_->GetObjectTree()->GetType(*baseType);
+                DMObject* context = (Proc_ && Proc_->OwningObject) ? Proc_->OwningObject : nullptr;
+                DMObject* baseObj = Compiler_->GetObjectTree()->GetType(baseTypePath, context);
                 if (baseObj) {
                     const DMVariable* field = baseObj->GetVariable(propIdent->Identifier);
                     if (field && field->Type) {
@@ -1562,12 +1568,11 @@ bool DMExpressionCompiler::CompileNewPath(DMASTNewPath* expr) {
             }
 
             if (typeObj == nullptr) {
-                std::cerr << "Warning: " << expr->Location_.ToString()
-                          << ": Bare 'new' inferred type '" << dreamPath.ToString()
-                          << "' could not be resolved" << std::endl;
-                Writer_->Emit(DreamProcOpcode::PushNull);
-                Writer_->ResizeStack(1);
-                return true;
+                Compiler_->ForcedError(
+                    expr->Location_,
+                    "Bare 'new' inferred type '" + dreamPath.ToString() + "' could not be resolved"
+                );
+                return false;
             }
 
             // CreateObject expects type on top of stack.
@@ -1590,12 +1595,11 @@ bool DMExpressionCompiler::CompileNewPath(DMASTNewPath* expr) {
             
             return true;
         } else {
-            // No expected type available - emit warning and push null
-            std::cerr << "Warning: " << expr->Location_.ToString() << ": Bare 'new' without type and no type can be inferred from context" << std::endl;
-            // Emit a placeholder null value
-            Writer_->Emit(DreamProcOpcode::PushNull);
-            Writer_->ResizeStack(1);
-            return true;
+            Compiler_->ForcedError(
+                expr->Location_,
+                "Bare 'new' without an explicit type cannot infer from context"
+            );
+            return false;
         }
     }
     
@@ -2107,9 +2111,15 @@ std::optional<DreamPath> DMExpressionCompiler::ResolveExpressionType(DMASTExpres
         // Recursively resolve base expression type
         auto baseType = ResolveExpressionType(deref->Expression.get());
         if (!baseType) return std::nullopt;
+
+        DreamPath baseTypePath = *baseType;
+        if (baseTypePath.GetPathType() == DreamPath::PathType::Relative) {
+            baseTypePath = DreamPath(DreamPath::PathType::Absolute, baseTypePath.GetElements());
+        }
         
         // Look up base type in object tree
-        DMObject* baseObj = Compiler_->GetObjectTree()->GetType(*baseType);
+        DMObject* context = (Proc_ && Proc_->OwningObject) ? Proc_->OwningObject : nullptr;
+        DMObject* baseObj = Compiler_->GetObjectTree()->GetType(baseTypePath, context);
         if (!baseObj) return std::nullopt;
         
         // Look up field on base type

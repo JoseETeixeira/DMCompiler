@@ -3,6 +3,41 @@
 #include <fstream>
 #include <filesystem>
 
+static bool CompileText(const std::string& fileName, const std::string& contents, bool expectSuccess) {
+    namespace fs = std::filesystem;
+
+    std::ofstream out(fileName, std::ios::binary);
+    out << contents;
+    out.close();
+
+    DMCompiler::DMCompilerSettings settings;
+    settings.Files.push_back(fileName);
+    settings.Verbose = false;
+    settings.SuppressUnimplementedWarnings = true;
+    // dm_compiler_tests is executed with cwd=build/tests (see SConstruct).
+    // Point the compiler at the deployed DMStandard in build/DMStandard.
+    settings.LibraryPaths.push_back("../DMStandard");
+
+    DMCompiler::DMCompiler compiler;
+    bool success = compiler.Compile(settings);
+
+    fs::path jsonPath = fs::path(fileName);
+    jsonPath.replace_extension(".json");
+
+    fs::remove(fileName);
+    fs::remove(jsonPath);
+
+    if (success != expectSuccess) {
+        std::cerr << "CompileText(" << fileName << ") expected "
+                  << (expectSuccess ? "success" : "failure")
+                  << " but got " << (success ? "success" : "failure")
+                  << std::endl;
+        return false;
+    }
+
+    return true;
+}
+
 static bool FileContainsAll(const std::filesystem::path& path, const std::vector<std::string>& needles) {
     std::ifstream in(path);
     if (!in.is_open()) return false;
@@ -94,6 +129,37 @@ bool TestInterfaceMetadataEmission() {
     return ok;
 }
 
+static bool TestBareNewInferenceFromDerefAssignment() {
+    std::cout << "Testing bare new() inference from deref assignment..." << std::endl;
+
+    // Ensure the RHS new() can infer from a dereferenced field's declared type.
+    // This should compile successfully.
+    const std::string dm =
+        "datum/holder\n"
+        "    var/datum/login_screen_manager/login_manager\n"
+        "\n"
+        "datum/login_screen_manager\n"
+        "\n"
+        "proc/test_deref_assign()\n"
+        "    var/datum/holder/H = new /datum/holder()\n"
+        "    H.login_manager = new()\n"
+        "    return\n";
+
+    return CompileText("test_bare_new_deref_assign.dme", dm, true);
+}
+
+static bool TestBareNewUninferableIsHardError() {
+    std::cout << "Testing bare new() uninferable is hard error..." << std::endl;
+
+    // No declared type context: should be a hard compile error.
+    const std::string dm =
+        "proc/test_uninferable()\n"
+        "    var/x = new()\n"
+        "    return\n";
+
+    return CompileText("test_bare_new_uninferable.dme", dm, false);
+}
+
 void TestWithActualDME() {
     std::cout << "Testing with actual .dme file if available..." << std::endl;
     
@@ -134,6 +200,14 @@ int RunCompilerTests() {
         TestWithActualDME();
 
         if (!TestInterfaceMetadataEmission()) {
+            failures++;
+        }
+
+        if (!TestBareNewInferenceFromDerefAssignment()) {
+            failures++;
+        }
+
+        if (!TestBareNewUninferableIsHardError()) {
             failures++;
         }
         

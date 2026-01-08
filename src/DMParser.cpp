@@ -190,17 +190,25 @@ Token DMParser::Advance() {
 
     static long long tokenAdvanceCount = 0;
     tokenAdvanceCount++;
-    if (tokenAdvanceCount % 1000 == 0) {
-        std::cout << "[parser] advanced " << tokenAdvanceCount
-                  << " tokens, current=" << CurrentToken_.Loc.ToString() << " type="
-                  << static_cast<int>(CurrentToken_.Type) << " text='" << CurrentToken_.Text << "'"
-                  << std::endl;
-    }
-    if (tokenAdvanceCount >= 9500 && tokenAdvanceCount <= 12500) {
-        std::cout << "[parser] trace " << tokenAdvanceCount
-                  << " @ " << CurrentToken_.Loc.ToString() << " type="
-                  << static_cast<int>(CurrentToken_.Type) << " text='" << CurrentToken_.Text << "'"
-                  << std::endl;
+
+    // Extremely verbose debug output; only enabled explicitly via compiler settings.
+    if (Compiler_) {
+        const auto& settings = Compiler_->GetSettings();
+
+        if (settings.ParserProgress && (tokenAdvanceCount % 1000 == 0)) {
+            std::cout << "[parser] advanced " << tokenAdvanceCount
+                      << " tokens, current=" << CurrentToken_.Loc.ToString() << " type="
+                      << static_cast<int>(CurrentToken_.Type) << " text='" << CurrentToken_.Text << "'"
+                      << std::endl;
+        }
+
+        // This fixed window exists to help debug specific parser hangs without printing the entire input.
+        if (settings.ParserTrace && (tokenAdvanceCount >= 9500 && tokenAdvanceCount <= 12500)) {
+            std::cout << "[parser] trace " << tokenAdvanceCount
+                      << " @ " << CurrentToken_.Loc.ToString() << " type="
+                      << static_cast<int>(CurrentToken_.Type) << " text='" << CurrentToken_.Text << "'"
+                      << std::endl;
+        }
     }
     return CurrentToken_;
 }
@@ -3344,8 +3352,8 @@ std::unique_ptr<DMASTObjectStatement> DMParser::ObjectStatement() {
         
         // Check for = -> could be var override or var definition
         if (Current().Type == TokenType::Assign) {
-            // If in var block, treat as variable definition
-            if (inVarBlock) {
+            // If in var block OR explicitly starts with var/, treat as variable definition
+            if (inVarBlock || pathStartsVar) {
                 // Parse as variable definition
                 // For "Beam/myBeam = value", path is "Beam/myBeam"
                 // Variable name is the last element: "myBeam"
@@ -3402,8 +3410,8 @@ std::unique_ptr<DMASTObjectStatement> DMParser::ObjectStatement() {
         }
         
         // Check for [ -> array syntax (e.g., techs[0] or weapon[])
-        // In a var block, this is a variable definition with array initialization
-        if (Current().Type == TokenType::LeftBracket && inVarBlock) {
+        // In a var block (or when explicitly starts with var/), this is a variable definition with array initialization
+        if (Current().Type == TokenType::LeftBracket && (inVarBlock || pathStartsVar)) {
             // Parse array size (if present)
             Advance(); // consume [
             Whitespace();
@@ -3454,9 +3462,9 @@ std::unique_ptr<DMASTObjectStatement> DMParser::ObjectStatement() {
         // Special case: if path is exactly "var", treat as object definition (block start)
         bool isVarKeyword = path.Path.GetElements().size() == 1 && path.Path.GetElements()[0] == "var";
 
-        if ((Current().Type == TokenType::Newline || 
-             Current().Type == TokenType::Semicolon ||
-             Current().Type == TokenType::EndOfFile) && inVarBlock && !isVarKeyword) {
+           if ((Current().Type == TokenType::Newline || 
+               Current().Type == TokenType::Semicolon ||
+               Current().Type == TokenType::EndOfFile) && (inVarBlock || pathStartsVar) && !isVarKeyword) {
                      
             // Check if this has a nested indented block after it
             // If so, treat as a type block (object definition), not a variable definition
@@ -3466,7 +3474,9 @@ std::unique_ptr<DMASTObjectStatement> DMParser::ObjectStatement() {
             //           tolog = new()
             // Where "list" should be a type context block, not a variable named "list"
             bool hasNestedBlock = false;
-            if (Current().Type == TokenType::Newline) {
+            // Only single-element paths are ambiguous (could be a nested type-context block).
+            // Multi-element paths like "Beam/myBeam" should always be treated as typed variable declarations.
+            if (Current().Type == TokenType::Newline && !pathStartsVar && path.Path.GetElements().size() == 1) {
                 int currentLineIndent = loc.Column;
                 
                 // Save position for lookahead
@@ -3488,7 +3498,7 @@ std::unique_ptr<DMASTObjectStatement> DMParser::ObjectStatement() {
                 
                 // Backtrack to before the newline
                 ReuseToken(savedNewlineToken);
-            }    
+            }
 
             // If there's NO nested block, this is a variable definition without initialization
             if (!hasNestedBlock) {

@@ -21,6 +21,8 @@ void PrintHelp() {
     std::cout << "  --verbose                 : Show verbose output during compile" << std::endl;
     std::cout << "  --notices-enabled         : Show notice output during compile" << std::endl;
     std::cout << "  --no-opts                 : Disable compiler optimizations (debug only)" << std::endl;
+    std::cout << "  --parser-progress         : (Debug) Print periodic parser token progress" << std::endl;
+    std::cout << "  --parser-trace            : (Debug) Print very noisy parser token trace" << std::endl;
 }
 
 bool ParseArguments(int argc, char** argv, DMCompiler::DMCompilerSettings& settings) {
@@ -56,6 +58,12 @@ bool ParseArguments(int argc, char** argv, DMCompiler::DMCompilerSettings& setti
         }
         else if (arg == "--no-opts") {
             settings.NoOpts = true;
+        }
+        else if (arg == "--parser-progress") {
+            settings.ParserProgress = true;
+        }
+        else if (arg == "--parser-trace") {
+            settings.ParserTrace = true;
         }
         else if (arg == "--skip-anything-typecheck") {
             settings.SkipAnythingTypecheck = true;
