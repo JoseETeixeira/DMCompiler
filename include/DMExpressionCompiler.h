@@ -81,6 +81,12 @@ private:
     DMProc* Proc_;
     BytecodeWriter* Writer_;
     std::optional<DreamPath> ExpectedType_;  // Expected type for bare 'new' inference
+
+    int TempVarCounter_ = 0;
+
+    // Create a temporary local variable for stack shuffling.
+    // Used to preserve evaluation order while meeting VM stack layout requirements.
+    LocalVariable* CreateTempLocal(std::optional<DreamPath> type = std::nullopt);
     
     // Compile specific expression types
     bool CompileConstantInteger(DMASTConstantInteger* expr);

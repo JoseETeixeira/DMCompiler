@@ -7,6 +7,21 @@
 
 namespace DMCompiler {
 
+LocalVariable* DMExpressionCompiler::CreateTempLocal(std::optional<DreamPath> type) {
+    // Use a name unlikely to collide with user variables.
+    // Keep trying until we find an unused name.
+    for (int attempts = 0; attempts < 1024; attempts++) {
+        std::string name = "__kiro_tmp" + std::to_string(TempVarCounter_++);
+        if (Proc_->GetLocalVariable(name)) {
+            continue;
+        }
+        if (auto* var = Proc_->AddLocalVariable(name, type)) {
+            return var;
+        }
+    }
+    return nullptr;
+}
+
 DMExpressionCompiler::DMExpressionCompiler(DMCompiler* compiler, DMProc* proc, BytecodeWriter* writer)
     : Compiler_(compiler), Proc_(proc), Writer_(writer), ExpectedType_(std::nullopt) {
 }
@@ -216,23 +231,92 @@ bool DMExpressionCompiler::CompileBinaryOp(DMASTExpressionBinary* expr) {
         return CompileExpression(expr->Right.get());
     }
 
+    // Short-circuit logical operators
+    // In BYOND/DM, && and || do not evaluate the RHS when not needed.
+    if (expr->Operator == BinaryOperator::LogicalAnd) {
+        // a && b
+        // Evaluate a; if falsey -> result 0; else evaluate b and return !!b.
+        if (!CompileExpression(expr->Left.get())) {
+            return false;
+        }
+
+        const int label_false = Writer_->CreateLabel();
+        const int label_end = Writer_->CreateLabel();
+
+        // Pop a; if not truthy, jump to label_false
+        Writer_->EmitJump(DreamProcOpcode::JumpIfFalse, label_false);
+        Writer_->ResizeStack(-1);
+
+        // a truthy -> evaluate b
+        if (!CompileExpression(expr->Right.get())) {
+            return false;
+        }
+
+        // Normalize to boolean (0/1)
+        Writer_->Emit(DreamProcOpcode::BooleanNot);
+        Writer_->Emit(DreamProcOpcode::BooleanNot);
+
+        Writer_->EmitJump(DreamProcOpcode::Jump, label_end);
+
+        // a falsey -> result 0
+        Writer_->MarkLabel(label_false);
+        Writer_->EmitFloat(DreamProcOpcode::PushFloat, 0.0f);
+        Writer_->ResizeStack(1);
+
+        Writer_->MarkLabel(label_end);
+        return true;
+    }
+
+    if (expr->Operator == BinaryOperator::LogicalOr) {
+        // a || b
+        // Evaluate a; if truthy -> result 1; else evaluate b and return !!b.
+        if (!CompileExpression(expr->Left.get())) {
+            return false;
+        }
+
+        const int label_rhs = Writer_->CreateLabel();
+        const int label_end = Writer_->CreateLabel();
+
+        // Pop a; if not truthy, jump to RHS evaluation
+        Writer_->EmitJump(DreamProcOpcode::JumpIfFalse, label_rhs);
+        Writer_->ResizeStack(-1);
+
+        // a truthy -> result 1
+        Writer_->EmitFloat(DreamProcOpcode::PushFloat, 1.0f);
+        Writer_->ResizeStack(1);
+        Writer_->EmitJump(DreamProcOpcode::Jump, label_end);
+
+        // a falsey -> evaluate b
+        Writer_->MarkLabel(label_rhs);
+        if (!CompileExpression(expr->Right.get())) {
+            return false;
+        }
+
+        // Normalize to boolean (0/1)
+        Writer_->Emit(DreamProcOpcode::BooleanNot);
+        Writer_->Emit(DreamProcOpcode::BooleanNot);
+
+        Writer_->MarkLabel(label_end);
+        return true;
+    }
+
     // Compile left operand (pushes value on stack)
     if (!CompileExpression(expr->Left.get())) {
         return false;
     }
-    
+
     // Compile right operand (pushes value on stack)
     if (!CompileExpression(expr->Right.get())) {
         return false;
     }
-    
+
     // Emit the operation (consumes two values, pushes result)
     DreamProcOpcode opcode = GetBinaryOpcode(expr->Operator);
     if (opcode == DreamProcOpcode::Error) {
         Compiler_->ForcedWarning("Unsupported binary operator");
         return false;
     }
-    
+
     Writer_->Emit(opcode);
     Writer_->ResizeStack(-1);  // Pops 2 values, pushes 1 (net -1)
     return true;
@@ -486,35 +570,90 @@ DreamProcOpcode DMExpressionCompiler::GetBinaryOpcode(BinaryOperator op) {
 }
 
 bool DMExpressionCompiler::CompileDereference(DMASTDereference* expr) {
-    // Compile the object/list expression first (pushes onto stack)
+    const bool isSafe = (expr->Type == DereferenceType::Safe || expr->Type == DereferenceType::SafeSearch);
+
+    if (!isSafe) {
+        // Compile the object/list expression first (pushes onto stack)
+        if (!CompileExpression(expr->Expression.get())) {
+            return false;
+        }
+    
+        // Check if this is field access (obj.field) or indexing (list[index])
+        // Field access: Property is an identifier AND not explicitly an index
+        // Indexing: Property is any other expression OR explicitly an index
+        auto* propIdent = dynamic_cast<DMASTIdentifier*>(expr->Property.get());
+
+        if (propIdent && expr->Type != DereferenceType::Index) {
+            // Field access: obj.field
+            // Emit DereferenceField opcode with field name (pops object, pushes field value, net 0)
+            Writer_->EmitString(DreamProcOpcode::DereferenceField, propIdent->Identifier);
+            // Net result: 1 value on stack (the field value)
+        }
+        else {
+            // Indexing: list[index] or obj[expr]
+            // Compile the index expression (pushes index onto stack)
+            if (!CompileExpression(expr->Property.get())) {
+                return false;
+            }
+
+            // Emit DereferenceIndex opcode (no operands, uses stack values)
+            // Stack: [object/list] [index] -> [value at index]
+            Writer_->Emit(DreamProcOpcode::DereferenceIndex);
+            Writer_->ResizeStack(-1);  // Pops 2 values (object + index), pushes 1 (result), net -1
+        }
+
+        return true;
+    }
+
+    // Safe/Null-conditional dereference (?. / ?:)
+    // Semantics: if base is null, result is null and the access is not evaluated.
+    auto* temp = CreateTempLocal();
+    if (!temp) {
+        Compiler_->ForcedError(expr->Location_, "Failed to allocate temporary local for safe dereference");
+        return false;
+    }
+
+    // Evaluate base expression first (preserve evaluation order), then store it.
     if (!CompileExpression(expr->Expression.get())) {
         return false;
     }
-    
-    // Check if this is field access (obj.field) or indexing (list[index])
-    // Field access: Property is an identifier AND not explicitly an index
-    // Indexing: Property is any other expression OR explicitly an index
+    std::vector<uint8_t> tempRef = { 28, static_cast<uint8_t>(temp->Id) };
+    Writer_->EmitMulti(DreamProcOpcode::AssignNoPush, tempRef);
+    Writer_->ResizeStack(-1);
+
+    // If temp is null -> jump to nullResult.
+    Writer_->EmitMulti(DreamProcOpcode::PushReferenceValue, tempRef);
+    Writer_->ResizeStack(1);
+    int nullLabel = Writer_->CreateLabel();
+    int endLabel = Writer_->CreateLabel();
+    Writer_->EmitJump(DreamProcOpcode::JumpIfNull, nullLabel);
+    Writer_->ResizeStack(-1);
+
+    // Non-null: perform dereference.
     auto* propIdent = dynamic_cast<DMASTIdentifier*>(expr->Property.get());
-    
     if (propIdent && expr->Type != DereferenceType::Index) {
-        // Field access: obj.field
-        // Emit DereferenceField opcode with field name (pops object, pushes field value, net 0)
+        Writer_->EmitMulti(DreamProcOpcode::PushReferenceValue, tempRef);
+        Writer_->ResizeStack(1);
         Writer_->EmitString(DreamProcOpcode::DereferenceField, propIdent->Identifier);
-        // Net result: 1 value on stack (the field value)
+        // DereferenceField: pops object, pushes field value -> net 0
     }
     else {
-        // Indexing: list[index] or obj[expr]
-        // Compile the index expression (pushes index onto stack)
+        Writer_->EmitMulti(DreamProcOpcode::PushReferenceValue, tempRef);
+        Writer_->ResizeStack(1);
         if (!CompileExpression(expr->Property.get())) {
             return false;
         }
-        
-        // Emit DereferenceIndex opcode (no operands, uses stack values)
-        // Stack: [object/list] [index] -> [value at index]
         Writer_->Emit(DreamProcOpcode::DereferenceIndex);
-        Writer_->ResizeStack(-1);  // Pops 2 values (object + index), pushes 1 (result), net -1
+        Writer_->ResizeStack(-1);
     }
-    
+    Writer_->EmitJump(DreamProcOpcode::Jump, endLabel);
+
+    // Null branch: push null.
+    Writer_->MarkLabel(nullLabel);
+    Writer_->Emit(DreamProcOpcode::PushNull);
+    Writer_->ResizeStack(1);
+
+    Writer_->MarkLabel(endLabel);
     return true;
 }
 
@@ -535,11 +674,21 @@ DMExpressionCompiler::CallArgumentsResult DMExpressionCompiler::CompileCallArgum
             return result;
         }
     }
+
+    const bool hasNamedArgs = seenNamed;
     
     // First pass: compile positional arguments (params without Key)
     for (const auto& param : params) {
         if (param->Key) continue;  // Skip named args in first pass
-        
+
+        // If there are any named args, represent *all* args as (key,value) pairs.
+        // Positional args use a null key. This matches the VM's FromStackKeyed
+        // calling convention (pairs), and avoids ambiguous mixed layouts.
+        if (hasNamedArgs) {
+            Writer_->Emit(DreamProcOpcode::PushNull);
+            Writer_->ResizeStack(1);
+        }
+
         if (!CompileExpression(param->Value.get())) {
             result.success = false;
             return result;
@@ -584,16 +733,21 @@ DMExpressionCompiler::CallArgumentsResult DMExpressionCompiler::CompileCallArgum
         }
         result.namedCount++;
     }
-    
-    result.totalCount = result.positionalCount + result.namedCount;
-    
+
+    const int totalArgs = result.positionalCount + result.namedCount;
+
     // Determine arguments type
-    if (result.totalCount == 0) {
+    if (totalArgs == 0) {
         result.argsType = DMCallArgumentsType::None;
+        result.totalCount = 0;
     } else if (result.namedCount > 0) {
         result.argsType = DMCallArgumentsType::FromStackKeyed;
+        // FromStackKeyed encodes key/value pairs; stack_delta is item-count.
+        result.totalCount = totalArgs * 2;
     } else {
         result.argsType = DMCallArgumentsType::FromStack;
+        // FromStack encodes only values; stack_delta is value-count.
+        result.totalCount = totalArgs;
     }
     
     return result;
@@ -617,40 +771,82 @@ bool DMExpressionCompiler::CompileCall(DMASTCall* expr) {
         Writer_->AppendInt(args.totalCount);
         
         // CallStatement pops arguments and pushes result
-        // For keyed args: each named arg pushes 2 values (key + value)
+        // For keyed args: all args are key/value pairs (positional key is null)
         int stackPushed = args.positionalCount + (args.namedCount * 2);
+        if (args.argsType == DMCallArgumentsType::FromStackKeyed) {
+            stackPushed = (args.positionalCount + args.namedCount) * 2;
+        }
         Writer_->ResizeStack(1 - stackPushed);
         
         return true;
     }
     
-    // Check if target is a method call (obj.method()) - DMASTDereference
+    // Check if target is a method call (obj.method() / obj?.method()) - DMASTDereference
     auto* deref = dynamic_cast<DMASTDereference*>(expr->Target.get());
     if (deref) {
         // Method call: obj.method(args)
         // Only if property is an identifier
         auto* methodIdent = dynamic_cast<DMASTIdentifier*>(deref->Property.get());
         if (methodIdent) {
-            // Compile object expression first
+            const bool isSafe = (deref->Type == DereferenceType::Safe || deref->Type == DereferenceType::SafeSearch);
+
+            // VM stack layout for DereferenceCall is: [args...] [object] -> [result]
+            // DM evaluation order is receiver first, then args.
+            // Preserve evaluation order by storing the receiver into a temp local.
+            auto* temp = CreateTempLocal();
+            if (!temp) {
+                Compiler_->ForcedError(expr->Location_, "Failed to allocate temporary local for method call");
+                return false;
+            }
+            std::vector<uint8_t> tempRef = { 28, static_cast<uint8_t>(temp->Id) };
+
+            // Evaluate receiver, then store it.
             if (!CompileExpression(deref->Expression.get())) {
                 return false;
             }
-            
-            // Compile arguments using helper (supports named arguments)
+            Writer_->EmitMulti(DreamProcOpcode::AssignNoPush, tempRef);
+            Writer_->ResizeStack(-1);
+
+            int nullLabel = -1;
+            int endLabel = -1;
+            if (isSafe) {
+                nullLabel = Writer_->CreateLabel();
+                endLabel = Writer_->CreateLabel();
+
+                // If receiver is null, skip evaluating args and return null.
+                Writer_->EmitMulti(DreamProcOpcode::PushReferenceValue, tempRef);
+                Writer_->ResizeStack(1);
+                Writer_->EmitJump(DreamProcOpcode::JumpIfNull, nullLabel);
+                Writer_->ResizeStack(-1);
+            }
+
+            // Compile arguments (only after null-check for safe calls)
             auto args = CompileCallArguments(expr->Parameters);
             if (!args.success) return false;
-            
-            // Emit DereferenceCall: opcode + procName + argumentsType + argumentCount
-            // DereferenceCall takes: string (proc name), byte (args type), int (arg count)
+
+            // Push receiver LAST
+            Writer_->EmitMulti(DreamProcOpcode::PushReferenceValue, tempRef);
+            Writer_->ResizeStack(1);
+
+            // Emit DereferenceCall
             Writer_->EmitString(DreamProcOpcode::DereferenceCall, methodIdent->Identifier);
             Writer_->AppendByte(static_cast<uint8_t>(args.argsType));
             Writer_->AppendInt(args.totalCount);
-            
-            // DereferenceCall pops object + arguments, pushes result
-            // For keyed args: each named arg pushes 2 values (key + value)
+
             int stackPushed = args.positionalCount + (args.namedCount * 2);
-            Writer_->ResizeStack(-stackPushed);  // net: 1 (result) - 1 (obj) - stackPushed = -stackPushed
-            
+            if (args.argsType == DMCallArgumentsType::FromStackKeyed) {
+                stackPushed = (args.positionalCount + args.namedCount) * 2;
+            }
+            Writer_->ResizeStack(-stackPushed);
+
+            if (isSafe) {
+                Writer_->EmitJump(DreamProcOpcode::Jump, endLabel);
+                Writer_->MarkLabel(nullLabel);
+                Writer_->Emit(DreamProcOpcode::PushNull);
+                Writer_->ResizeStack(1);
+                Writer_->MarkLabel(endLabel);
+            }
+
             return true;
         }
         // If not an identifier property (e.g. L[i]()), it's a complex target.
@@ -704,27 +900,29 @@ bool DMExpressionCompiler::CompileCall(DMASTCall* expr) {
                     // Check if this is a member proc (not a global proc)
                     if (resolvedProc->OwningObject && resolvedProc->OwningObject != Compiler_->GetObjectTree()->GetRoot()) {
                         // This is a member proc call on src (implicit this)
-                        // Compile as: push src first, then args, then call method
-                        // Stack order must be [object, args...] with last arg on top
-                        // so that VM can pop args then pop object
-                        
-                        // Push src (the current object) FIRST
-                        std::vector<uint8_t> srcRef = { 1 };  // DMReference.Type.Src
-                        Writer_->EmitMulti(DreamProcOpcode::PushReferenceValue, srcRef);
-                        Writer_->ResizeStack(1);  // Pushes src
-                        
+                        // VM stack layout for DereferenceCall is: [args...] [object] -> [result]
+                        // so we must push args first, then push src last.
+
                         // Compile arguments using helper (supports named arguments)
                         auto args = CompileCallArguments(expr->Parameters);
                         if (!args.success) return false;
-                        
+
+                        // Push src (the current object) LAST
+                        std::vector<uint8_t> srcRef = { 1 };  // DMReference.Type.Src
+                        Writer_->EmitMulti(DreamProcOpcode::PushReferenceValue, srcRef);
+                        Writer_->ResizeStack(1);
+
                         // Call the method
                         Writer_->EmitString(DreamProcOpcode::DereferenceCall, procName);
                         Writer_->AppendByte(static_cast<uint8_t>(args.argsType));
                         Writer_->AppendInt(args.totalCount);
                         
                         // DereferenceCall pops object + arguments, pushes result
-                        // For keyed args: each named arg pushes 2 values (key + value)
+                        // For keyed args: all args are key/value pairs (positional key is null)
                         int stackPushed = args.positionalCount + (args.namedCount * 2);
+                        if (args.argsType == DMCallArgumentsType::FromStackKeyed) {
+                            stackPushed = (args.positionalCount + args.namedCount) * 2;
+                        }
                         Writer_->ResizeStack(-stackPushed);  // net: 1 (result) - 1 (src) - stackPushed = -stackPushed
                         
                         return true;
@@ -747,8 +945,11 @@ bool DMExpressionCompiler::CompileCall(DMASTCall* expr) {
                 Writer_->AppendInt(args.totalCount);
                 
                 // Call pops arguments and pushes result
-                // For keyed args: each named arg pushes 2 values (key + value)
+                // For keyed args: all args are key/value pairs (positional key is null)
                 int stackPushed = args.positionalCount + (args.namedCount * 2);
+                if (args.argsType == DMCallArgumentsType::FromStackKeyed) {
+                    stackPushed = (args.positionalCount + args.namedCount) * 2;
+                }
                 Writer_->ResizeStack(1 - stackPushed);
                 
                 return true;
@@ -811,8 +1012,11 @@ bool DMExpressionCompiler::CompileCall(DMASTCall* expr) {
             Writer_->AppendInt(args.totalCount);
             
             // CallStatement pops: args + call() args (1 or 2) + pushes result
-            // For keyed args: each named arg pushes 2 values (key + value)
+            // For keyed args: all args are key/value pairs (positional key is null)
             int stackPushed = args.positionalCount + (args.namedCount * 2);
+            if (args.argsType == DMCallArgumentsType::FromStackKeyed) {
+                stackPushed = (args.positionalCount + args.namedCount) * 2;
+            }
             int stackDelta = 1 - stackPushed - static_cast<int>(callArgsCount);
             Writer_->ResizeStack(stackDelta);
             
@@ -843,8 +1047,11 @@ bool DMExpressionCompiler::CompileCall(DMASTCall* expr) {
     Writer_->AppendInt(args.totalCount);
     
     // CallStatement pops arguments + target and pushes result
-    // For keyed args: each named arg pushes 2 values (key + value)
+    // For keyed args: all args are key/value pairs (positional key is null)
     int stackPushed = args.positionalCount + (args.namedCount * 2);
+    if (args.argsType == DMCallArgumentsType::FromStackKeyed) {
+        stackPushed = (args.positionalCount + args.namedCount) * 2;
+    }
     // Net change: 1 (result) - stackPushed (args) - 1 (target) = -stackPushed
     Writer_->ResizeStack(-stackPushed);
     

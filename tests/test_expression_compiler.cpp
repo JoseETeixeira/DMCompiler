@@ -108,6 +108,87 @@ bool TestCompileUnaryNegation() {
     return true;
 }
 
+// Test compiling short-circuit logical AND
+bool TestCompileLogicalAndShortCircuit() {
+    std::cout << "  TestCompileLogicalAndShortCircuit... ";
+
+    DMCompiler::BytecodeWriter writer;
+    DMCompiler::DMCompiler compiler;
+    DMCompiler::DMObject testObj(0, DMCompiler::DreamPath("/test"));
+    DMCompiler::DMProc proc(0, "test_proc", &testObj, false, DMCompiler::Location());
+    DMCompiler::DMExpressionCompiler exprCompiler(&compiler, &proc, &writer);
+
+    // Create AST: 0 && 1
+    auto left = std::make_unique<DMCompiler::DMASTConstantInteger>(DMCompiler::Location(), 0);
+    auto right = std::make_unique<DMCompiler::DMASTConstantInteger>(DMCompiler::Location(), 1);
+    auto expr = std::make_unique<DMCompiler::DMASTExpressionBinary>(
+        DMCompiler::Location(),
+        DMCompiler::BinaryOperator::LogicalAnd,
+        std::move(left),
+        std::move(right)
+    );
+
+    bool success = exprCompiler.CompileExpression(expr.get());
+    assert(success && "Should successfully compile logical AND");
+
+    const auto& bytecode = writer.GetBytecode();
+
+    // Expected structure:
+    // PushFloat, JumpIfFalse, PushFloat, BooleanNot, BooleanNot, Jump, PushFloat
+    assert(bytecode.size() >= 1 && "AND should emit bytecode");
+    assert(bytecode[0] == static_cast<uint8_t>(DMCompiler::DreamProcOpcode::PushFloat));
+
+    // After PushFloat (5 bytes), we should see JumpIfFalse (1 byte + 4 offset)
+    assert(bytecode.size() >= 10 && "AND should include a JumpIfFalse");
+    assert(bytecode[5] == static_cast<uint8_t>(DMCompiler::DreamProcOpcode::JumpIfFalse));
+
+    // Ensure we are NOT using the eager BooleanAnd opcode
+    for (uint8_t b : bytecode) {
+        assert(b != static_cast<uint8_t>(DMCompiler::DreamProcOpcode::BooleanAnd));
+    }
+
+    std::cout << "PASSED" << std::endl;
+    return true;
+}
+
+// Test compiling short-circuit logical OR
+bool TestCompileLogicalOrShortCircuit() {
+    std::cout << "  TestCompileLogicalOrShortCircuit... ";
+
+    DMCompiler::BytecodeWriter writer;
+    DMCompiler::DMCompiler compiler;
+    DMCompiler::DMObject testObj(0, DMCompiler::DreamPath("/test"));
+    DMCompiler::DMProc proc(0, "test_proc", &testObj, false, DMCompiler::Location());
+    DMCompiler::DMExpressionCompiler exprCompiler(&compiler, &proc, &writer);
+
+    // Create AST: 1 || 0
+    auto left = std::make_unique<DMCompiler::DMASTConstantInteger>(DMCompiler::Location(), 1);
+    auto right = std::make_unique<DMCompiler::DMASTConstantInteger>(DMCompiler::Location(), 0);
+    auto expr = std::make_unique<DMCompiler::DMASTExpressionBinary>(
+        DMCompiler::Location(),
+        DMCompiler::BinaryOperator::LogicalOr,
+        std::move(left),
+        std::move(right)
+    );
+
+    bool success = exprCompiler.CompileExpression(expr.get());
+    assert(success && "Should successfully compile logical OR");
+
+    const auto& bytecode = writer.GetBytecode();
+
+    // Must include a JumpIfFalse early, and must not include eager BooleanOr.
+    assert(bytecode.size() >= 6 && "OR should emit bytecode");
+    assert(bytecode[0] == static_cast<uint8_t>(DMCompiler::DreamProcOpcode::PushFloat));
+    assert(bytecode[5] == static_cast<uint8_t>(DMCompiler::DreamProcOpcode::JumpIfFalse));
+
+    for (uint8_t b : bytecode) {
+        assert(b != static_cast<uint8_t>(DMCompiler::DreamProcOpcode::BooleanOr));
+    }
+
+    std::cout << "PASSED" << std::endl;
+    return true;
+}
+
 // Test compiling a local variable reference
 bool TestCompileLocalVariable() {
     std::cout << "  TestCompileLocalVariable... ";
@@ -137,6 +218,113 @@ bool TestCompileLocalVariable() {
     assert(bytecode[1] == 28 && "Should be Local reference type");
     assert(bytecode[2] == 0 && "Should be variable ID 0");
     
+    std::cout << "PASSED" << std::endl;
+    return true;
+}
+
+// Test that method calls place args before object for DereferenceCall
+bool TestMethodCallStackOrder() {
+    std::cout << "  TestMethodCallStackOrder... ";
+
+    DMCompiler::BytecodeWriter writer;
+    DMCompiler::DMCompiler compiler;
+    DMCompiler::DMObject testObj(0, DMCompiler::DreamPath("/test"));
+    DMCompiler::DMProc proc(0, "test_proc", &testObj, false, DMCompiler::Location());
+
+    // Receiver local
+    proc.AddLocalVariable("myobj");
+
+    DMCompiler::DMExpressionCompiler exprCompiler(&compiler, &proc, &writer);
+
+    // AST: myobj.Foo(1)
+    auto recv = std::make_unique<DMCompiler::DMASTIdentifier>(DMCompiler::Location(), "myobj");
+    auto prop = std::make_unique<DMCompiler::DMASTIdentifier>(DMCompiler::Location(), "Foo");
+    auto deref = std::make_unique<DMCompiler::DMASTDereference>(
+        DMCompiler::Location(),
+        std::move(recv),
+        DMCompiler::DereferenceType::Direct,
+        std::move(prop));
+
+    std::vector<std::unique_ptr<DMCompiler::DMASTCallParameter>> params;
+    params.push_back(std::make_unique<DMCompiler::DMASTCallParameter>(
+        DMCompiler::Location(),
+        nullptr,
+        std::make_unique<DMCompiler::DMASTConstantInteger>(DMCompiler::Location(), 1)));
+
+    auto call = std::make_unique<DMCompiler::DMASTCall>(DMCompiler::Location(), std::move(deref), std::move(params));
+
+    bool success = exprCompiler.CompileExpression(call.get());
+    assert(success && "Should successfully compile method call");
+
+    const auto& bytecode = writer.GetBytecode();
+
+    auto find_opcode = [&](DMCompiler::DreamProcOpcode op) -> int {
+        for (size_t i = 0; i < bytecode.size(); i++) {
+            if (bytecode[i] == static_cast<uint8_t>(op)) return static_cast<int>(i);
+        }
+        return -1;
+    };
+
+    int idxPushFloat = find_opcode(DMCompiler::DreamProcOpcode::PushFloat);
+    int idxPushRef = find_opcode(DMCompiler::DreamProcOpcode::PushReferenceValue);
+    int idxDerefCall = find_opcode(DMCompiler::DreamProcOpcode::DereferenceCall);
+
+    assert(idxPushFloat != -1 && "Should push arg onto stack");
+    assert(idxPushRef != -1 && "Should push receiver onto stack");
+    assert(idxDerefCall != -1 && "Should emit DereferenceCall");
+
+    // Receiver must be pushed after the argument is pushed.
+    assert(idxPushRef > idxPushFloat && "Receiver should be pushed after args (args-first layout)");
+    assert(idxDerefCall > idxPushRef && "DereferenceCall should occur after pushing receiver");
+
+    std::cout << "PASSED" << std::endl;
+    return true;
+}
+
+// Test that null-conditional method call emits JumpIfNull guard
+bool TestSafeMethodCallEmitsJumpIfNull() {
+    std::cout << "  TestSafeMethodCallEmitsJumpIfNull... ";
+
+    DMCompiler::BytecodeWriter writer;
+    DMCompiler::DMCompiler compiler;
+    DMCompiler::DMObject testObj(0, DMCompiler::DreamPath("/test"));
+    DMCompiler::DMProc proc(0, "test_proc", &testObj, false, DMCompiler::Location());
+
+    proc.AddLocalVariable("myobj");
+
+    DMCompiler::DMExpressionCompiler exprCompiler(&compiler, &proc, &writer);
+
+    // AST: myobj?.Foo(1)
+    auto recv = std::make_unique<DMCompiler::DMASTIdentifier>(DMCompiler::Location(), "myobj");
+    auto prop = std::make_unique<DMCompiler::DMASTIdentifier>(DMCompiler::Location(), "Foo");
+    auto deref = std::make_unique<DMCompiler::DMASTDereference>(
+        DMCompiler::Location(),
+        std::move(recv),
+        DMCompiler::DereferenceType::Safe,
+        std::move(prop));
+
+    std::vector<std::unique_ptr<DMCompiler::DMASTCallParameter>> params;
+    params.push_back(std::make_unique<DMCompiler::DMASTCallParameter>(
+        DMCompiler::Location(),
+        nullptr,
+        std::make_unique<DMCompiler::DMASTConstantInteger>(DMCompiler::Location(), 1)));
+
+    auto call = std::make_unique<DMCompiler::DMASTCall>(DMCompiler::Location(), std::move(deref), std::move(params));
+
+    bool success = exprCompiler.CompileExpression(call.get());
+    assert(success && "Should successfully compile safe method call");
+
+    const auto& bytecode = writer.GetBytecode();
+
+    bool sawJumpIfNull = false;
+    for (uint8_t b : bytecode) {
+        if (b == static_cast<uint8_t>(DMCompiler::DreamProcOpcode::JumpIfNull)) {
+            sawJumpIfNull = true;
+            break;
+        }
+    }
+    assert(sawJumpIfNull && "Safe method call should emit JumpIfNull guard");
+
     std::cout << "PASSED" << std::endl;
     return true;
 }
@@ -3567,6 +3755,8 @@ int RunExpressionCompilerTests() {
         if (!TestCompileIntegerConstant()) failures++;
         if (!TestCompileAddition()) failures++;
         if (!TestCompileUnaryNegation()) failures++;
+        if (!TestCompileLogicalAndShortCircuit()) failures++;
+        if (!TestCompileLogicalOrShortCircuit()) failures++;
         if (!TestCompileLocalVariable()) failures++;
         if (!TestCompileParameter()) failures++;
         if (!TestCompileSpecialIdentifierSrc()) failures++;
@@ -3578,6 +3768,8 @@ int RunExpressionCompilerTests() {
         if (!TestCompileMethodCallNoArgs()) failures++;
         if (!TestCompileMethodCallWithArgs()) failures++;
         if (!TestCompileMethodCallInExpression()) failures++;
+        if (!TestMethodCallStackOrder()) failures++;
+        if (!TestSafeMethodCallEmitsJumpIfNull()) failures++;
         if (!TestCompileWorldMethodCall()) failures++;
         if (!TestCompileMethodCallMixedArgs()) failures++;
         if (!TestCompileNestedMethodCalls()) failures++;
