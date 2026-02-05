@@ -1,16 +1,20 @@
-// database type definition
+// database type definition - SQLite database access
 /database
 	parent_type = /datum
+
 	proc/Close()
 	proc/Error()
 	proc/ErrorMsg()
+
 	New(filename)
 		if (filename)
 			Open(filename)
+
 	proc/Open(filename)
 
 /database/query
-	var/_binobj as opendream_unimplemented
+	var/_binobj
+
 	proc/Add(text, ...)
 	proc/Clear()
 	Close()
@@ -23,6 +27,4 @@
 	New(Query, Cursor)
 	proc/NextRow()
 	proc/RowsAffected()
-
 	proc/Reset()
-

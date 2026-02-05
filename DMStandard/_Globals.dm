@@ -1,7 +1,4 @@
-
-// global.vars
-// Same order as BYOND
-// Values are validated in "test_builtin_globals.dm"
+// Global variables - same order as BYOND
 
 var/global/UNIX = "UNIX"
 var/global/NORTH = 1

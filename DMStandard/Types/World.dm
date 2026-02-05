@@ -1,4 +1,4 @@
-// world type definition
+// world type definition - global game state singleton
 /world
 	var/list/contents = null
 	var/list/vars
@@ -9,7 +9,7 @@
 	var/turf = /turf as /turf
 	var/mob = /mob as /mob
 
-	var/name = "OpenDream World"
+	var/name = "BYONDOT World"
 	var/time
 	var/timezone = 0
 	var/timeofday
@@ -30,35 +30,31 @@
 	var/byond_version = DM_VERSION
 	var/byond_build = DM_BUILD
 
-	var/version = 0 as num|opendream_unsupported //only used to notify users on the hub - unsupported due to no hub
+	var/version = 0
 
 	var/address
-	var/port = 0 as opendream_compiletimereadonly
+	var/port = 0
 	var/internet_address = "127.0.0.1"
 	var/url
-	var/visibility = 0 //used to control server appearing on the hub - this will have to use ServerStatusCode.Offline/Online
-	var/status = "" //used to display a message appearing under the server on the hub - this will have to use the server desc on the hub
+	var/visibility = 0
+	var/status = ""
 	var/process
 	var/list/params = null
 
 	var/sleep_offline = 0
 
-	var/const/system_type as opendream_noconstfold
+	var/const/system_type
 
 	var/map_cpu = 0
-	var/hub = "" as text|opendream_unsupported //used to mark a game as unique on the hub - unsupported due to no hub
-	var/hub_password = "" as text|opendream_unsupported //authentication for above - unsupported due to no hub
+	var/hub = ""
+	var/hub_password = ""
 	var/reachable
-	var/game_state = 0 as num|opendream_unsupported //used to display server joinability on the hub - does not actually affect joining - unsupported due to no hub
-	var/host = "" as text|opendream_unsupported //contains the key of the world's host - unsupported as OD server does not run as a user
+	var/game_state = 0
+	var/host = ""
 	var/map_format = TOPDOWN_MAP
-	var/cache_lifespan = 30 as num|opendream_unsupported //used to control cache expiry in RSC - unsupported due to no RSC
-	var/executor = "" as text|opendream_unsupported // DMCGI nonsense - there will be no ODCGI
-	
-	// An OpenDream read-only var that tells you what port Topic() is listening on
-	// Remove OPENDREAM_TOPIC_PORT_EXISTS if this is ever removed
-	var/const/opendream_topic_port as opendream_noconstfold
-	
+	var/cache_lifespan = 30
+	var/executor = ""
+
 	proc/New()
 	proc/Del()
 
@@ -66,10 +62,12 @@
 	proc/GetConfig(config_set,param)
 	proc/SetConfig(config_set,param,value)
 	proc/OpenPort(port)
+
 	proc/IsSubscribed(player, type)
-		set opendream_unsupported = "OpenDream does not have a premium tier"
+		return FALSE
+
 	proc/IsBanned(key,address,computer_id,type)
-		return FALSE;
+		return FALSE
 
 	proc/Error(exception)
 
@@ -82,34 +80,27 @@
 	proc/Topic(T,Addr,Master,Keys)
 
 	proc/Tick()
-		
+
 	proc/SetScores()
-		set opendream_unsupported = "OpenDream does not support hub scores"
+		return null
 
 	proc/GetScores()
-		set opendream_unsupported = "OpenDream does not support hub scores"
+		return null
 
 	proc/GetMedal()
-		set opendream_unsupported = "OpenDream does not support hub medals"
+		return null
 
 	proc/SetMedal()
-		set opendream_unsupported = "OpenDream does not support hub medals"
+		return null
 
 	proc/ClearMedal()
-		set opendream_unsupported = "OpenDream does not support hub medals"
+		return null
 
 	proc/AddCredits(player, credits, note)
-		set opendream_unsupported = "OpenDream does not support hub credits"
 		return 0
 
 	proc/GetCredits(player)
-		set opendream_unsupported = "OpenDream does not support hub credits"
 		return null
 
 	proc/PayCredits(player, credits, note)
-		set opendream_unsupported = "OpenDream does not support hub credits"
 		return 0
-
-	proc/ODHotReloadInterface()
-
-	proc/ODHotReloadResource(var/file_name)

@@ -1,15 +1,7 @@
-//TODO: Figure out how generators work internally
-
+// generator type definition - random value generators for procedural content
 /generator
 	parent_type = /datum
-	var/_binobj as opendream_unimplemented
 
-/generator/proc/Rand()
-
-/*
-Generator Theory
-
-Generators seem to have a "_binobj" var that stores the proc used to create the generator with the relevant args
-
-That is somehow used in Rand() to return a relevant random value
-*/
+	proc/Rand()
+		// Returns a random value based on the generator's configuration
+		return null

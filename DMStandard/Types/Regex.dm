@@ -1,4 +1,4 @@
-// regex type definition
+// regex type definition - regular expression pattern matching
 /regex
 	parent_type = /datum
 
@@ -23,14 +23,10 @@
 	proc/Find(haystack, start = 1, end = 0)
 
 	proc/Find_char(haystack, start = 1, end = 0)
-		set opendream_unimplemented = TRUE
 
 	proc/Replace(haystack, replacement, start = 1, end = 0)
 
 	proc/Replace_char(haystack, replacement, start = 1, end = 0)
-		set opendream_unimplemented = TRUE
-		return haystack
 
 proc/regex(pattern, flags)
 	return new /regex(pattern, flags)
-

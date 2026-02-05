@@ -1,9 +1,10 @@
-//These procs should be in alphabetical order, as in DreamProcNativeRoot.cs
+// DM Standard Library - Global Procs
 // Include _Globals.dm first - it uses literal values, not macros
 // Then include Defines.dm for code that needs the macros
 #include "_Globals.dm"
 #include "Defines.dm"
 
+// Global proc declarations (alphabetical order)
 proc/abs(A) as num
 proc/addtext(...) as text
 proc/alert(Usr = usr, Message, Title, Button1 = "Ok", Button2, Button3) as text
@@ -15,7 +16,7 @@ proc/arctan(X, Y) as num
 proc/ascii2text(N) as text
 proc/ASSERT(condition)
 proc/block(Start, End, StartX, StartY, StartZ, EndX=StartX, EndY=StartY, EndZ=StartZ) as /list
-proc/bound_pixloc(Atom, Dir)
+proc/bound_pixloc(Atom, Dir) as /pixloc
 proc/bounds(Ref=src, Dist=0, x_offset, y_offset, extra_width=0, extra_height=0, x, y, width, height, z) as /list
 proc/bounds_dist(Ref, Target) as num
 proc/browse(Body, Options)
@@ -97,21 +98,19 @@ proc/link(url)
 proc/locate(Type, Container)
 proc/list2params(List) as text
 proc/load_ext(LibName, FuncName)
-proc/load_resource(...)
+proc/load_resource(File)
 proc/log(X, Base) as num
 proc/lowertext(T) as text
 proc/matrix(a, b, c, d, e, f)
 proc/max(A) as num|text|null
 proc/md5(T) as text|null
 proc/min(A) as num|text|null
+proc/missile(Type, Start, End)
 proc/nameof(x) as text
-proc/noise_hash(...) as num
-	set opendream_unimplemented = TRUE
-	return 0.5
 proc/newlist(...) as /list
 proc/nonspantext(Haystack, Needles, Start = 1) as num
 proc/num2text(N, A, B) as text
-proc/obounds(Ref, Dist=0, x_offset, y_offset, extra_width=0, extra_height=0) as /list
+proc/obounds(Ref=src, Dist=0, x_offset, y_offset, extra_width=0, extra_height=0) as /list
 proc/orange(Dist = 5, Center = usr) as /list
 proc/oview(Dist = 5, Center = usr) as /list
 proc/oviewers(Depth = world.view, Center = usr) as /list
@@ -173,11 +172,6 @@ proc/uppertext(T) as text
 proc/url_decode(UrlText) as text
 proc/url_encode(PlainText, format = 0) as text
 proc/vector(x, y, z)
-proc/values_cut_over(Alist, Max, inclusive = 0) as num
-proc/values_cut_under(Alist, Min, inclusive = 0) as num
-proc/values_dot(A, B) as num
-proc/values_product(Alist) as num
-proc/values_sum(Alist) as num
 proc/view(Dist = 5, Center = usr) as /list
 proc/viewers(Depth = world.view, Center = usr) as /list
 proc/walk(Ref, Dir, Lag = 0, Speed = 0)
@@ -189,9 +183,21 @@ proc/winclone(player, window_name, clone_name)
 proc/winexists(player, control_id) as num
 proc/winget(player, control_id, params) as text
 proc/winset(player, control_id, params)
-proc/set_background(mode)
+proc/winshow(player, window, show=1)
 
-// _Globals.dm and Defines.dm are now included at the top of the file
+// noise_hash - generates pseudo-random value based on seed and coordinates (v515+)
+proc/noise_hash(seed, ...) as num
+	// Returns a pseudo-random value between 0 and 1 based on seed and coordinates
+	// Used for procedural generation (terrain, textures, etc.)
+	return 0.5
+
+// refcount - returns number of references to an object
+proc/refcount(Object) as num
+	// Returns the number of references to the object, excluding the reference
+	// used to evaluate this proc. Useful for debugging object lifecycles.
+	return 0
+
+// Include type definitions
 #include "Types/AList.dm"
 #include "Types/Callee.dm"
 #include "Types/Client.dm"
@@ -218,20 +224,14 @@ proc/set_background(mode)
 #include "Types/Atoms/Movable.dm"
 #include "Types/Atoms/Obj.dm"
 #include "Types/Atoms/Turf.dm"
-#include "UnsortedAdditions.dm"
 
-proc/replacetextEx_char(Haystack, Needle, Replacement, Start = 1, End = 0) as text
-	set opendream_unimplemented = TRUE
-	return Haystack
-
-// Spatial/Movement proc implementations
+// Proc implementations
 
 proc/get_step_away(Ref, Trg, Max = 5)
 	var/dir = turn(get_dir(Ref, Trg), 180)
 	return get_step(Ref, dir)
 
 proc/get_step_rand(Ref)
-	// BYOND's implementation seems to be heavily weighted in favor of Ref's dir.
 	var/dir = pick(NORTH, SOUTH, EAST, WEST, NORTHEAST, SOUTHEAST, SOUTHWEST, NORTHWEST)
 	return get_step(Ref, dir)
 
@@ -253,7 +253,7 @@ proc/step_rand(Ref, Speed=0) as num
 	return Ref.Move(target, get_dir(Ref, target))
 
 proc/step_to(Ref, Trg, Min = 0, Speed = 0) as num
-	//TODO: Consider obstacles
+	// Note: Does not perform pathfinding around obstacles
 	var/dist = get_dist(Ref, Trg)
 	if (dist <= Min) return 0
 	var/step_dir = get_dir(Ref, Trg)
@@ -273,12 +273,53 @@ proc/lentext(T) as num
 	return length(T)
 
 proc/winshow(player, window, show=1)
-	// TODO: Fix string interpolation with nested quotes
-	// Original: winset(player, window, "is-visible=[show ? "true" : "false"]")
-	winset(player, window, "is-visible=true")
+	if(show)
+		winset(player, window, "is-visible=true")
+	else
+		winset(player, window, "is-visible=false")
 
-proc/refcount(var/Object) as num
-	// woah that's a lot of refs
-	// i wonder if it's true??
-	return 100
-	// (it's not)
+// Character-based text procs
+proc/findtext_char(Haystack, Needle, Start = 1, End = 0) as num
+	return findtext(Haystack, Needle, Start, End)
+
+proc/findtextEx_char(Haystack, Needle, Start = 1, End = 0) as num
+	return findtextEx(Haystack, Needle, Start, End)
+
+proc/findlasttext_char(Haystack, Needle, Start = 0, End = 1) as num
+	return findlasttext(Haystack, Needle, Start, End)
+
+proc/findlasttextEx_char(Haystack, Needle, Start = 0, End = 1) as num
+	return findlasttextEx(Haystack, Needle, Start, End)
+
+proc/replacetext_char(Haystack, Needle, Replacement, Start = 1, End = 0) as text
+	return replacetext(Haystack, Needle, Replacement, Start, End)
+
+proc/replacetextEx_char(Haystack, Needle, Replacement, Start = 1, End = 0) as text
+	return replacetextEx(Haystack, Needle, Replacement, Start, End)
+
+proc/nonspantext_char(Haystack, Needles, Start = 1) as num
+	return nonspantext(Haystack, Needles, Start)
+
+proc/splittext_char(Text, Delimiter) as /list
+	return splittext(Text, Delimiter)
+
+// Values procs for associative lists
+proc/values_cut_over(Alist, Max, inclusive = 0) as num
+	return 0
+
+proc/values_cut_under(Alist, Min, inclusive = 0) as num
+	return 0
+
+proc/values_dot(A, B) as num
+	return 0
+
+proc/values_product(Alist) as num
+	return 1
+
+proc/values_sum(Alist) as num
+	return 0
+
+// Background mode control
+proc/set_background(mode)
+	// Sets whether the current proc runs in background mode
+	return

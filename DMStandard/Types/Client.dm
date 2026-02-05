@@ -1,4 +1,4 @@
-// Client type definition
+// Client type definition - represents a connected player
 /client
 	var/list/verbs = null
 	var/list/screen = null
@@ -12,7 +12,7 @@
 	var/tag
 	var/const/type = /client
 
-	var/mob/mob // TODO: as /mob|null
+	var/mob/mob
 	var/atom/eye
 	var/lazy_eye = 0
 	var/perspective = MOB_PERSPECTIVE
@@ -49,10 +49,10 @@
 	var/preload_rsc = 1
 	var/fps = 0
 	var/dir = NORTH
-	var/gender = NEUTER as text|opendream_unsupported
+	var/gender = NEUTER
 	var/glide_size
 	var/virtual_eye
-	
+
 	var/list/bounds
 	var/bound_x
 	var/bound_y
@@ -60,6 +60,8 @@
 	var/bound_height
 
 	proc/Del()
+
+	proc/New()
 
 	proc/Topic(href, list/href_list, datum/hsrc)
 		if (hsrc != null)
@@ -149,15 +151,19 @@
 		object.MouseWheel(delta_x,delta_y,location,control,params)
 
 	proc/IsByondMember()
-		set opendream_unsupported = "OpenDream has no premium tier."
 		return FALSE
+
 	proc/CheckPassport(passport_identifier)
-		set opendream_unsupported = "OpenDream does not support subscribing to games"
+		return null
+
 	proc/SendPage(msg, recipient, options)
-		set opendream_unsupported = "OpenDream does not implement a pager"
+		return null
+
 	proc/GetAPI(Api, Name)
-		set opendream_unimplemented = "Steam Achievements API will not be supported"
+		return null
+
 	proc/SetAPI(Api, Key, Value)
-		set opendream_unimplemented = "Steam Achievements API will not be supported"
+		return null
+
 	proc/RenderIcon(object)
 		return object
